@@ -1,0 +1,31 @@
+#crm-capture-btn {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 10000;
+  padding: 12px 24px;
+  background: #0073b1;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  transition: background 0.2s, transform 0.1s;
+}
+
+#crm-capture-btn:hover {
+  background: #005a8c;
+  transform: translateY(-1px);
+}
+
+#crm-capture-btn:active {
+  transform: translateY(0);
+}
+
+#crm-capture-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
