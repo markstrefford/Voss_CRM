@@ -30,6 +30,7 @@ async def get_telegram_app() -> Application | None:
         _app.add_handler(CommandHandler("note", cmd_note))
         _app.add_handler(CommandHandler("new", cmd_new))
         _app.add_handler(CommandHandler("find", cmd_find))
+        _app.add_handler(CommandHandler("followup", cmd_followup))
         _app.add_handler(CommandHandler("pipeline", cmd_pipeline))
         await _app.initialize()
         await _app.start()
@@ -62,6 +63,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"/today — today's follow-ups\n"
         f"/find <query> — search contacts & companies\n"
         f"/note Name — note text\n"
+        f"/followup Name — title, 2026-03-01\n"
         f"/new Name, Company, Role\n"
         f"/pipeline — deal summary",
         parse_mode="Markdown",
@@ -201,6 +203,74 @@ async def cmd_new(update: Update, context: ContextTypes.DEFAULT_TYPE):
     extras_str = f"\n{' · '.join(extras)}" if extras else ""
     await update.message.reply_text(
         f"\u2705 Created contact: *{name}*{role_str}{company_str}{extras_str}\nID: `{contact['id']}`",
+        parse_mode="Markdown",
+    )
+
+
+async def cmd_followup(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = " ".join(context.args) if context.args else ""
+    if not text or "—" not in text and " - " not in text:
+        await update.message.reply_text(
+            "Usage: /followup John Smith — Send proposal, 2026-03-01\n"
+            "Or: /followup John Smith - Send proposal, 2026-03-01\n\n"
+            "Format: Name — title, due_date, due_time (optional)\n"
+            "Example: /followup David Clark — Call re: contract, 2026-03-05, 14:00"
+        )
+        return
+
+    # Split name from the rest on em-dash or regular dash
+    sep = "—" if "—" in text else " - "
+    parts = text.split(sep, 1)
+    contact_name = parts[0].strip()
+    details = parts[1].strip() if len(parts) > 1 else ""
+
+    if not details:
+        await update.message.reply_text("Please provide a title and due date after the dash.")
+        return
+
+    # Parse details: title, due_date, due_time (optional)
+    detail_parts = [p.strip() for p in details.split(",")]
+    title = detail_parts[0] if detail_parts else ""
+    due_date = detail_parts[1] if len(detail_parts) > 1 else ""
+    due_time = detail_parts[2] if len(detail_parts) > 2 else ""
+
+    if not title or not due_date:
+        await update.message.reply_text("Both title and due date are required.\nExample: /followup John Smith — Send proposal, 2026-03-01")
+        return
+
+    # Validate date format
+    try:
+        datetime.strptime(due_date, "%Y-%m-%d")
+    except ValueError:
+        await update.message.reply_text(f"Invalid date format: {due_date}\nUse YYYY-MM-DD (e.g. 2026-03-01)")
+        return
+
+    # Search for contact
+    name_parts = contact_name.split()
+    contacts = contacts_sheet.search(name_parts[0], ["first_name", "last_name"])
+    if len(name_parts) > 1:
+        contacts = [
+            c for c in contacts
+            if name_parts[-1].lower() in c.get("last_name", "").lower()
+        ]
+
+    if not contacts:
+        await update.message.reply_text(f"Contact '{contact_name}' not found.")
+        return
+
+    contact = contacts[0]
+    follow_ups_sheet.create({
+        "contact_id": contact["id"],
+        "title": title,
+        "due_date": due_date,
+        "due_time": due_time,
+        "status": "pending",
+    })
+
+    name = f"{contact['first_name']} {contact['last_name']}"
+    time_str = f" at {due_time}" if due_time else ""
+    await update.message.reply_text(
+        f"✅ Follow-up scheduled for *{name}*:\n_{title}_\nDue: {due_date}{time_str}",
         parse_mode="Markdown",
     )
 
