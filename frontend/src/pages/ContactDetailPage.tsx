@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getContact, updateContact, getInteractions, createInteraction, getDeals } from '@/api';
-import type { Contact, Interaction, Deal } from '@/types';
+import { getContact, updateContact, getInteractions, createInteraction, getDeals, getFollowUps, createFollowUp, completeFollowUp, snoozeFollowUp } from '@/api';
+import type { Contact, Interaction, Deal, FollowUp } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TagInput } from '@/components/shared/TagInput';
 import { EmailDraftModal } from '@/components/email/EmailDraftModal';
-import { ArrowLeft, Edit, Save, X, Plus, Mail } from 'lucide-react';
+import { ArrowLeft, Edit, Save, X, Plus, Mail, Check, Clock, CalendarPlus, ChevronDown, ChevronRight } from 'lucide-react';
 import { format } from 'date-fns';
 
 const SEGMENTS = ['', 'signal_strata', 'consulting', 'pe', 'other'] as const;
@@ -28,15 +28,46 @@ export function ContactDetailPage() {
   const [editForm, setEditForm] = useState<Partial<Contact>>({});
   const [interactions, setInteractions] = useState<Interaction[]>([]);
   const [deals, setDeals] = useState<Deal[]>([]);
+  const [followUps, setFollowUps] = useState<FollowUp[]>([]);
   const [showInteractionForm, setShowInteractionForm] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
+  const [showFollowUpForm, setShowFollowUpForm] = useState(false);
+  const [snoozeId, setSnoozeId] = useState<string | null>(null);
+  const [snoozeDate, setSnoozeDate] = useState('');
+  const [showCompleted, setShowCompleted] = useState(false);
 
   useEffect(() => {
     if (!id) return;
     getContact(id).then(res => { setContact(res.data); setEditForm(res.data); });
     getInteractions({ contact_id: id }).then(res => setInteractions(res.data));
     getDeals({ contact_id: id }).then(res => setDeals(res.data));
+    loadFollowUps(id);
   }, [id]);
+
+  const loadFollowUps = (contactId: string) => {
+    getFollowUps({ contact_id: contactId }).then(res => setFollowUps(res.data));
+  };
+
+  const handleCompleteFollowUp = async (followUpId: string) => {
+    await completeFollowUp(followUpId);
+    if (id) loadFollowUps(id);
+  };
+
+  const handleSnooze = async () => {
+    if (snoozeId && snoozeDate) {
+      await snoozeFollowUp(snoozeId, snoozeDate);
+      setSnoozeId(null);
+      setSnoozeDate('');
+      if (id) loadFollowUps(id);
+    }
+  };
+
+  const pendingFollowUps = followUps.filter(f => f.status === 'pending');
+  const today = new Date().toISOString().split('T')[0];
+  const overdueFollowUps = followUps.filter(f => f.status === 'pending' && f.due_date < today);
+  const dueTodayFollowUps = followUps.filter(f => f.status === 'pending' && f.due_date === today);
+  const upcomingFollowUps = followUps.filter(f => f.status === 'pending' && f.due_date > today);
+  const completedFollowUps = followUps.filter(f => f.status === 'completed');
 
   const handleSave = async () => {
     if (!id) return;
@@ -74,6 +105,7 @@ export function ContactDetailPage() {
           <TabsTrigger value="info">Info</TabsTrigger>
           <TabsTrigger value="timeline">Timeline ({interactions.length})</TabsTrigger>
           <TabsTrigger value="deals">Deals ({deals.length})</TabsTrigger>
+          <TabsTrigger value="followups">Follow-ups ({pendingFollowUps.length})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="info">
@@ -189,6 +221,70 @@ export function ContactDetailPage() {
             </div>
           )}
         </TabsContent>
+
+        <TabsContent value="followups">
+          <div className="space-y-4">
+            <Button onClick={() => setShowFollowUpForm(true)}><Plus className="h-4 w-4 mr-1" /> Schedule Follow-up</Button>
+
+            {followUps.length === 0 ? (
+              <p className="text-muted-foreground text-center py-4">No follow-ups</p>
+            ) : (
+              <>
+                <FollowUpSection title="Overdue" items={overdueFollowUps} variant="destructive" onComplete={handleCompleteFollowUp} onSnooze={setSnoozeId} />
+                <FollowUpSection title="Due Today" items={dueTodayFollowUps} variant="default" onComplete={handleCompleteFollowUp} onSnooze={setSnoozeId} />
+                <FollowUpSection title="Upcoming" items={upcomingFollowUps} variant="secondary" onComplete={handleCompleteFollowUp} onSnooze={setSnoozeId} />
+                {completedFollowUps.length > 0 && (
+                  <div className="space-y-2">
+                    <button
+                      className="text-lg font-semibold flex items-center gap-2 hover:opacity-80"
+                      onClick={() => setShowCompleted(v => !v)}
+                    >
+                      {showCompleted ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                      Completed <Badge variant="outline">{completedFollowUps.length}</Badge>
+                    </button>
+                    {showCompleted && (
+                      <div className="space-y-2">
+                        {completedFollowUps.slice(0, 5).map(f => (
+                          <Card key={f.id}>
+                            <CardContent className="pt-4">
+                              <p className="font-medium line-through text-muted-foreground">{f.title}</p>
+                              <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
+                                <Clock className="h-3 w-3" />
+                                {f.due_date} {f.due_time && `at ${f.due_time}`}
+                              </div>
+                              {f.notes && <p className="text-sm text-muted-foreground mt-1">{f.notes}</p>}
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
+          <FollowUpFormDialog
+            open={showFollowUpForm}
+            onOpenChange={setShowFollowUpForm}
+            contactId={id!}
+            onSaved={() => loadFollowUps(id!)}
+          />
+
+          <Dialog open={!!snoozeId} onOpenChange={() => setSnoozeId(null)}>
+            <DialogContent>
+              <DialogHeader><DialogTitle>Snooze Follow-up</DialogTitle></DialogHeader>
+              <div className="space-y-2">
+                <Label>New Due Date</Label>
+                <Input type="date" value={snoozeDate} onChange={e => setSnoozeDate(e.target.value)} />
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setSnoozeId(null)}>Cancel</Button>
+                <Button onClick={handleSnooze} disabled={!snoozeDate}>Snooze</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </TabsContent>
       </Tabs>
 
       {showEmailModal && <EmailDraftModal open={showEmailModal} onOpenChange={setShowEmailModal} contactId={id!} />}
@@ -254,6 +350,85 @@ function InteractionFormDialog({ open, onOpenChange, contactId, onSaved }: { ope
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button onClick={handleSubmit} disabled={saving}>Save</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function FollowUpSection({ title, items, variant, onComplete, onSnooze }: {
+  title: string;
+  items: FollowUp[];
+  variant: 'default' | 'destructive' | 'secondary' | 'outline';
+  onComplete: (id: string) => void;
+  onSnooze: (id: string) => void;
+}) {
+  if (items.length === 0) return null;
+
+  return (
+    <div className="space-y-2">
+      <h2 className="text-lg font-semibold flex items-center gap-2">
+        {title} <Badge variant={variant}>{items.length}</Badge>
+      </h2>
+      <div className="space-y-2">
+        {items.map(f => (
+          <Card key={f.id}>
+            <CardContent className="pt-4 flex items-center justify-between">
+              <div>
+                <p className="font-medium">{f.title}</p>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
+                  <Clock className="h-3 w-3" />
+                  {f.due_date} {f.due_time && `at ${f.due_time}`}
+                </div>
+                {f.notes && <p className="text-sm text-muted-foreground mt-1">{f.notes}</p>}
+              </div>
+              <div className="flex gap-1">
+                <Button variant="ghost" size="icon" title="Complete" onClick={() => onComplete(f.id)}>
+                  <Check className="h-4 w-4 text-green-600" />
+                </Button>
+                <Button variant="ghost" size="icon" title="Snooze" onClick={() => onSnooze(f.id)}>
+                  <CalendarPlus className="h-4 w-4" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function FollowUpFormDialog({ open, onOpenChange, contactId, onSaved }: { open: boolean; onOpenChange: (v: boolean) => void; contactId: string; onSaved: () => void }) {
+  const [form, setForm] = useState({ title: '', due_date: '', due_time: '', notes: '' });
+  const [saving, setSaving] = useState(false);
+
+  const handleSubmit = async () => {
+    setSaving(true);
+    try {
+      await createFollowUp({ ...form, contact_id: contactId });
+      onOpenChange(false);
+      setForm({ title: '', due_date: '', due_time: '', notes: '' });
+      onSaved();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Schedule Follow-up</DialogTitle></DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-2"><Label>Title *</Label><Input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="e.g. Send proposal, Follow up on meeting" /></div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2"><Label>Due Date *</Label><Input type="date" value={form.due_date} onChange={e => setForm(f => ({ ...f, due_date: e.target.value }))} /></div>
+            <div className="space-y-2"><Label>Due Time</Label><Input type="time" value={form.due_time} onChange={e => setForm(f => ({ ...f, due_time: e.target.value }))} /></div>
+          </div>
+          <div className="space-y-2"><Label>Notes</Label><Textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} /></div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={handleSubmit} disabled={saving || !form.title || !form.due_date}>Save</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
