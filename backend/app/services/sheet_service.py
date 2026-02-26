@@ -71,6 +71,34 @@ class SheetService:
                 return r
         return None
 
+    def bulk_create(self, data_list: list[dict]) -> list[dict]:
+        """Batch-insert multiple records in a single API call using append_rows()."""
+        if not data_list:
+            return []
+
+        now = self._now()
+        records = []
+        rows = []
+
+        for data in data_list:
+            record = {col: "" for col in self.columns}
+            record["id"] = self._new_id()
+            record["created_at"] = now
+            if "updated_at" in self.columns:
+                record["updated_at"] = now
+
+            for key, value in data.items():
+                if key in record and key not in ("id", "created_at"):
+                    record[key] = str(value) if value is not None else ""
+
+            records.append(record)
+            rows.append([record.get(col, "") for col in self.columns])
+
+        ws = self._worksheet()
+        ws.append_rows(rows, value_input_option="USER_ENTERED")
+        self._invalidate_cache()
+        return records
+
     def create(self, data: dict) -> dict:
         record = {col: "" for col in self.columns}
         record["id"] = self._new_id()
