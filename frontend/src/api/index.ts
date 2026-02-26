@@ -1,5 +1,5 @@
 import api from './client';
-import type { Contact, Company, Deal, DashboardSummary, EmailDraft, FollowUp, Interaction } from '@/types';
+import type { Contact, Company, Deal, DashboardSummary, ActionFeed, EmailDraft, FollowUp, Interaction } from '@/types';
 
 // Auth
 export const login = (username: string, password: string) =>
@@ -85,6 +85,9 @@ export const getDashboardSummary = () =>
 
 export const getStalDeals = () =>
   api.get<{ stale_deals: Deal[]; count: number }>('/api/dashboard/stale-deals');
+
+export const getActionFeed = () =>
+  api.get<ActionFeed>('/api/dashboard/action-feed');
 
 // Email
 export const generateEmailDraft = (data: { contact_id: string; deal_id?: string; intent: string; tone: string }) =>

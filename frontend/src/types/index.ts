@@ -101,3 +101,68 @@ export interface EmailDraft {
   subject: string;
   body: string;
 }
+
+// Action Feed (Smart Queues Dashboard)
+export interface ActionFeedFollowUpItem {
+  id: string;
+  contact_id: string;
+  contact_name: string;
+  company_name: string;
+  title: string;
+  due_date: string;
+  due_time: string;
+}
+
+export interface ActionFeedContactItem {
+  id: string;
+  name: string;
+  company_name: string;
+  role: string;
+  engagement_stage: string;
+  last_interaction_date: string;
+  reason: string;
+}
+
+export interface ActionFeedDealItem {
+  id: string;
+  title: string;
+  contact_name: string;
+  company_name: string;
+  stage: string;
+  value: number;
+  days_stale: number;
+}
+
+export interface ActionFeedStats {
+  total_active_contacts: number;
+  in_conversation: number;
+  follow_ups_this_week: number;
+  deals_in_pipeline: number;
+  pipeline_value: number;
+}
+
+export interface ActionFeed {
+  stats: ActionFeedStats;
+  action_required: {
+    overdue_follow_ups: ActionFeedFollowUpItem[];
+    due_today: ActionFeedFollowUpItem[];
+    overdue_total: number;
+    due_today_total: number;
+  };
+  momentum: {
+    inbound_recent: ActionFeedContactItem[];
+    no_follow_up_scheduled: ActionFeedContactItem[];
+    inbound_recent_total: number;
+    no_follow_up_scheduled_total: number;
+  };
+  at_risk: {
+    going_cold: ActionFeedContactItem[];
+    stale_deals: ActionFeedDealItem[];
+    going_cold_total: number;
+    stale_deals_total: number;
+  };
+  ready_to_reach_out: {
+    new_contacts: ActionFeedContactItem[];
+    new_contacts_total: number;
+  };
+}
