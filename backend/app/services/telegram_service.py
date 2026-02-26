@@ -25,6 +25,7 @@ async def get_telegram_app() -> Application | None:
         return None
     if _app is None:
         _app = Application.builder().token(settings.telegram_bot_token).build()
+        _app.add_handler(CommandHandler("start", cmd_start))
         _app.add_handler(CommandHandler("today", cmd_today))
         _app.add_handler(CommandHandler("note", cmd_note))
         _app.add_handler(CommandHandler("new", cmd_new))
@@ -49,6 +50,22 @@ async def send_message(chat_id: str, text: str):
     app = await get_telegram_app()
     if app:
         await app.bot.send_message(chat_id=int(chat_id), text=text, parse_mode="Markdown")
+
+
+async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    username = update.effective_user.username or "unknown"
+    await update.message.reply_text(
+        f"Welcome to Voss CRM!\n\n"
+        f"Your chat ID: `{chat_id}`\n\n"
+        f"Commands:\n"
+        f"/today — today's follow-ups\n"
+        f"/find <query> — search contacts & companies\n"
+        f"/note Name — note text\n"
+        f"/new Name, Company, Role\n"
+        f"/pipeline — deal summary",
+        parse_mode="Markdown",
+    )
 
 
 async def cmd_today(update: Update, context: ContextTypes.DEFAULT_TYPE):
