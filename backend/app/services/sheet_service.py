@@ -135,7 +135,9 @@ class SheetService:
 CONTACTS_COLUMNS = [
     "id", "company_id", "first_name", "last_name", "email", "phone",
     "role", "linkedin_url", "urls", "source", "referral_contact_id",
-    "tags", "notes", "status", "created_at", "updated_at",
+    "tags", "notes", "status",
+    "segment", "engagement_stage", "inbound_channel", "do_not_contact", "campaign_id",
+    "created_at", "updated_at",
 ]
 
 COMPANIES_COLUMNS = [

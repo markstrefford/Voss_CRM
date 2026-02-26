@@ -13,16 +13,25 @@ async def list_contacts(
     tag: str | None = Query(None),
     status_filter: str | None = Query(None, alias="status"),
     company_id: str | None = Query(None),
+    segment: str | None = Query(None),
+    engagement_stage: str | None = Query(None),
     _user: dict = Depends(get_current_user),
 ):
     if q:
-        records = contacts_sheet.search(q, ["first_name", "last_name", "email", "company_id", "tags", "notes"])
+        records = contacts_sheet.search(q, [
+            "first_name", "last_name", "email", "company_id", "tags", "notes",
+            "segment", "engagement_stage",
+        ])
     else:
         filters = {}
         if status_filter:
             filters["status"] = status_filter
         if company_id:
             filters["company_id"] = company_id
+        if segment:
+            filters["segment"] = segment
+        if engagement_stage:
+            filters["engagement_stage"] = engagement_stage
         records = contacts_sheet.get_all(filters or None)
 
     if tag:

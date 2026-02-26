@@ -132,7 +132,11 @@ async def cmd_note(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cmd_new(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = " ".join(context.args) if context.args else ""
     if not text:
-        await update.message.reply_text("Usage: /new Jane Doe, Acme Corp, CTO")
+        await update.message.reply_text(
+            "Usage: /new Jane Doe, Acme Corp, CTO, consulting, nurturing, linkedin\n"
+            "Fields: name, company, role, segment, stage, channel\n"
+            "Only name is required — the rest are optional."
+        )
         return
 
     parts = [p.strip() for p in text.split(",")]
@@ -142,6 +146,9 @@ async def cmd_new(update: Update, context: ContextTypes.DEFAULT_TYPE):
     last_name = " ".join(name_parts[1:]) if len(name_parts) > 1 else ""
     company_name = parts[1] if len(parts) > 1 else ""
     role = parts[2] if len(parts) > 2 else ""
+    segment = parts[3] if len(parts) > 3 else ""
+    engagement_stage = parts[4] if len(parts) > 4 else "new"
+    inbound_channel = parts[5] if len(parts) > 5 else ""
 
     # Resolve company
     company_id = ""
@@ -159,13 +166,24 @@ async def cmd_new(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "company_id": company_id,
         "role": role,
         "source": "telegram",
+        "segment": segment,
+        "engagement_stage": engagement_stage,
+        "inbound_channel": inbound_channel,
     })
 
     name = f"{first_name} {last_name}".strip()
     company_str = f" at {company_name}" if company_name else ""
     role_str = f" ({role})" if role else ""
+    extras = []
+    if segment:
+        extras.append(segment)
+    if engagement_stage and engagement_stage != "new":
+        extras.append(engagement_stage)
+    if inbound_channel:
+        extras.append(inbound_channel)
+    extras_str = f"\n{' · '.join(extras)}" if extras else ""
     await update.message.reply_text(
-        f"\u2705 Created contact: *{name}*{role_str}{company_str}\nID: `{contact['id']}`",
+        f"\u2705 Created contact: *{name}*{role_str}{company_str}{extras_str}\nID: `{contact['id']}`",
         parse_mode="Markdown",
     )
 
@@ -185,7 +203,9 @@ async def cmd_find(update: Update, context: ContextTypes.DEFAULT_TYPE):
         lines.append(f"*Contacts ({len(contacts)}):*")
         for c in contacts[:5]:
             name = f"{c.get('first_name', '')} {c.get('last_name', '')}".strip()
-            lines.append(f"  \u2022 {name} — {c.get('role', '')} | {c.get('email', '')}")
+            meta = " · ".join(filter(None, [c.get("segment"), c.get("engagement_stage")]))
+            meta_str = f" [{meta}]" if meta else ""
+            lines.append(f"  \u2022 {name} — {c.get('role', '')} | {c.get('email', '')}{meta_str}")
 
     if companies:
         lines.append(f"\n*Companies ({len(companies)}):*")

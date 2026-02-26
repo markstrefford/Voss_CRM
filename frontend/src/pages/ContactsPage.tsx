@@ -12,7 +12,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Trash2, Mail, Phone } from 'lucide-react';
+
+const SEGMENTS = ['', 'signal_strata', 'consulting', 'pe', 'other'] as const;
+const ENGAGEMENT_STAGES = ['new', 'nurturing', 'active', 'client', 'churned'] as const;
+const INBOUND_CHANNELS = ['', 'linkedin', 'referral', 'conference', 'cold_outbound', 'website', 'other'] as const;
 
 export function ContactsPage() {
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -73,6 +78,12 @@ export function ContactsPage() {
                   {c.email && <div className="flex items-center gap-1"><Mail className="h-3 w-3" />{c.email}</div>}
                   {c.phone && <div className="flex items-center gap-1"><Phone className="h-3 w-3" />{c.phone}</div>}
                 </div>
+                {(c.segment || c.engagement_stage) && (
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {c.segment && <Badge variant="outline" className="text-xs">{c.segment}</Badge>}
+                    {c.engagement_stage && <Badge variant="secondary" className="text-xs">{c.engagement_stage}</Badge>}
+                  </div>
+                )}
                 {c.tags && (
                   <div className="flex flex-wrap gap-1 mt-2">
                     {c.tags.split(',').map(t => <Badge key={t.trim()} variant="secondary" className="text-xs">{t.trim()}</Badge>)}
@@ -91,7 +102,7 @@ export function ContactsPage() {
 }
 
 function ContactFormDialog({ open, onOpenChange, onSaved }: { open: boolean; onOpenChange: (v: boolean) => void; onSaved: () => void }) {
-  const [form, setForm] = useState({ first_name: '', last_name: '', email: '', phone: '', role: '', tags: '', notes: '' });
+  const [form, setForm] = useState({ first_name: '', last_name: '', email: '', phone: '', role: '', tags: '', notes: '', segment: '', engagement_stage: 'new', inbound_channel: '' });
   const [saving, setSaving] = useState(false);
 
   const handleSubmit = async () => {
@@ -99,7 +110,7 @@ function ContactFormDialog({ open, onOpenChange, onSaved }: { open: boolean; onO
     try {
       await createContact(form);
       onOpenChange(false);
-      setForm({ first_name: '', last_name: '', email: '', phone: '', role: '', tags: '', notes: '' });
+      setForm({ first_name: '', last_name: '', email: '', phone: '', role: '', tags: '', notes: '', segment: '', engagement_stage: 'new', inbound_channel: '' });
       onSaved();
     } finally {
       setSaving(false);
@@ -116,6 +127,33 @@ function ContactFormDialog({ open, onOpenChange, onSaved }: { open: boolean; onO
           <div className="space-y-2"><Label>Email</Label><Input value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} /></div>
           <div className="space-y-2"><Label>Phone</Label><Input value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} /></div>
           <div className="space-y-2 col-span-2"><Label>Role</Label><Input value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))} /></div>
+          <div className="space-y-2">
+            <Label>Segment</Label>
+            <Select value={form.segment} onValueChange={v => setForm(f => ({ ...f, segment: v }))}>
+              <SelectTrigger><SelectValue placeholder="Select segment" /></SelectTrigger>
+              <SelectContent>
+                {SEGMENTS.filter(Boolean).map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Engagement Stage</Label>
+            <Select value={form.engagement_stage} onValueChange={v => setForm(f => ({ ...f, engagement_stage: v }))}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {ENGAGEMENT_STAGES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2 col-span-2">
+            <Label>Inbound Channel</Label>
+            <Select value={form.inbound_channel} onValueChange={v => setForm(f => ({ ...f, inbound_channel: v }))}>
+              <SelectTrigger><SelectValue placeholder="Select channel" /></SelectTrigger>
+              <SelectContent>
+                {INBOUND_CHANNELS.filter(Boolean).map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
           <div className="space-y-2 col-span-2"><Label>Tags (comma-separated)</Label><Input value={form.tags} onChange={e => setForm(f => ({ ...f, tags: e.target.value }))} /></div>
           <div className="space-y-2 col-span-2"><Label>Notes</Label><Textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} /></div>
         </div>

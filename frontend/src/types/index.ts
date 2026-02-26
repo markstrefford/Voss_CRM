@@ -13,6 +13,11 @@ export interface Contact {
   tags: string;
   notes: string;
   status: string;
+  segment: string;
+  engagement_stage: string;
+  inbound_channel: string;
+  do_not_contact: string;
+  campaign_id: string;
   created_at: string;
   updated_at: string;
 }

@@ -16,6 +16,10 @@ import { EmailDraftModal } from '@/components/email/EmailDraftModal';
 import { ArrowLeft, Edit, Save, X, Plus, Mail } from 'lucide-react';
 import { format } from 'date-fns';
 
+const SEGMENTS = ['', 'signal_strata', 'consulting', 'pe', 'other'] as const;
+const ENGAGEMENT_STAGES = ['new', 'nurturing', 'active', 'client', 'churned'] as const;
+const INBOUND_CHANNELS = ['', 'linkedin', 'referral', 'conference', 'cold_outbound', 'website', 'other'] as const;
+
 export function ContactDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -83,6 +87,33 @@ export function ContactDetailPage() {
                   <div className="space-y-2"><Label>Phone</Label><Input value={editForm.phone || ''} onChange={e => setEditForm(f => ({ ...f, phone: e.target.value }))} /></div>
                   <div className="space-y-2"><Label>Role</Label><Input value={editForm.role || ''} onChange={e => setEditForm(f => ({ ...f, role: e.target.value }))} /></div>
                   <div className="space-y-2"><Label>LinkedIn</Label><Input value={editForm.linkedin_url || ''} onChange={e => setEditForm(f => ({ ...f, linkedin_url: e.target.value }))} /></div>
+                  <div className="space-y-2">
+                    <Label>Segment</Label>
+                    <Select value={editForm.segment || ''} onValueChange={v => setEditForm(f => ({ ...f, segment: v }))}>
+                      <SelectTrigger><SelectValue placeholder="Select segment" /></SelectTrigger>
+                      <SelectContent>
+                        {SEGMENTS.filter(Boolean).map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Engagement Stage</Label>
+                    <Select value={editForm.engagement_stage || ''} onValueChange={v => setEditForm(f => ({ ...f, engagement_stage: v }))}>
+                      <SelectTrigger><SelectValue placeholder="Select stage" /></SelectTrigger>
+                      <SelectContent>
+                        {ENGAGEMENT_STAGES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Inbound Channel</Label>
+                    <Select value={editForm.inbound_channel || ''} onValueChange={v => setEditForm(f => ({ ...f, inbound_channel: v }))}>
+                      <SelectTrigger><SelectValue placeholder="Select channel" /></SelectTrigger>
+                      <SelectContent>
+                        {INBOUND_CHANNELS.filter(Boolean).map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <div className="space-y-2 col-span-2"><Label>Tags</Label><TagInput value={editForm.tags || ''} onChange={v => setEditForm(f => ({ ...f, tags: v }))} /></div>
                   <div className="space-y-2 col-span-2"><Label>Notes</Label><Textarea value={editForm.notes || ''} onChange={e => setEditForm(f => ({ ...f, notes: e.target.value }))} /></div>
                 </>
@@ -94,6 +125,9 @@ export function ContactDetailPage() {
                   <InfoRow label="LinkedIn" value={contact.linkedin_url} link />
                   <InfoRow label="Source" value={contact.source} />
                   <InfoRow label="Status" value={contact.status} />
+                  <InfoRow label="Segment" value={contact.segment} />
+                  <InfoRow label="Engagement Stage" value={contact.engagement_stage} />
+                  <InfoRow label="Inbound Channel" value={contact.inbound_channel} />
                   <div className="col-span-2">
                     <p className="text-sm text-muted-foreground">Tags</p>
                     <div className="flex flex-wrap gap-1 mt-1">

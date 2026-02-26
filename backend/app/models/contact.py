@@ -15,6 +15,11 @@ class ContactCreate(BaseModel):
     tags: str = ""
     notes: str = ""
     status: str = "active"
+    segment: str = ""
+    engagement_stage: str = "new"
+    inbound_channel: str = ""
+    do_not_contact: str = ""
+    campaign_id: str = ""
 
 
 class ContactUpdate(BaseModel):
@@ -31,6 +36,11 @@ class ContactUpdate(BaseModel):
     tags: str | None = None
     notes: str | None = None
     status: str | None = None
+    segment: str | None = None
+    engagement_stage: str | None = None
+    inbound_channel: str | None = None
+    do_not_contact: str | None = None
+    campaign_id: str | None = None
 
 
 class ContactFromLinkedIn(BaseModel):
@@ -58,5 +68,10 @@ class Contact(BaseModel):
     tags: str = ""
     notes: str = ""
     status: str = "active"
+    segment: str = ""
+    engagement_stage: str = ""
+    inbound_channel: str = ""
+    do_not_contact: str = ""
+    campaign_id: str = ""
     created_at: str = ""
     updated_at: str = ""
