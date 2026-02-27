@@ -3,7 +3,7 @@ import re
 from datetime import datetime, timezone
 
 from telegram import Update
-from telegram.ext import Application, CommandHandler, ContextTypes
+from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
 
 from app.config import settings
 from app.helpers import contact_display_name, group_follow_ups, today_str
@@ -32,6 +32,8 @@ async def get_telegram_app() -> Application | None:
         _app.add_handler(CommandHandler("new", cmd_new))
         _app.add_handler(CommandHandler("find", cmd_find))
         _app.add_handler(CommandHandler("followup", cmd_followup))
+        _app.add_handler(CommandHandler("done", cmd_done))
+        _app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_done_pick))
         _app.add_handler(CommandHandler("pipeline", cmd_pipeline))
         await _app.initialize()
         await _app.start()
@@ -62,6 +64,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"Your chat ID: `{chat_id}`\n\n"
         f"Commands:\n"
         f"/today — today's follow-ups\n"
+        f"/done Name — complete a follow-up\n"
         f"/find <query> — search contacts & companies\n"
         f"/note Name — note text\n"
         f"/followup Name — title, 2026-03-01\n"
@@ -272,6 +275,101 @@ async def cmd_followup(update: Update, context: ContextTypes.DEFAULT_TYPE):
     time_str = f" at {due_time}" if due_time else ""
     await update.message.reply_text(
         f"✅ Follow-up scheduled for *{name}*:\n_{title}_\nDue: {due_date}{time_str}",
+        parse_mode="Markdown",
+    )
+
+
+async def cmd_done(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = " ".join(context.args) if context.args else ""
+    if not text:
+        await update.message.reply_text("Usage: /done John Smith")
+        return
+
+    # Search for contact
+    name_parts = text.strip().split()
+    contacts = contacts_sheet.search(name_parts[0], ["first_name", "last_name"])
+    if len(name_parts) > 1:
+        contacts = [
+            c for c in contacts
+            if name_parts[-1].lower() in c.get("last_name", "").lower()
+        ]
+
+    if not contacts:
+        await update.message.reply_text(f"Contact '{text}' not found.")
+        return
+
+    contact = contacts[0]
+    name = contact_display_name(contact)
+
+    # Get pending follow-ups for this contact
+    pending = [
+        f for f in follow_ups_sheet.get_all({"status": "pending"})
+        if f.get("contact_id") == contact["id"]
+    ]
+
+    if not pending:
+        await update.message.reply_text(f"No pending follow-ups for *{name}*.", parse_mode="Markdown")
+        return
+
+    if len(pending) == 1:
+        # Only one — complete it directly
+        fup = pending[0]
+        follow_ups_sheet.update(fup["id"], {
+            "status": "completed",
+            "completed_at": datetime.now(timezone.utc).isoformat(),
+        })
+        await update.message.reply_text(
+            f"✅ Completed: *{fup.get('title', '')}* — {name}",
+            parse_mode="Markdown",
+        )
+        return
+
+    # Multiple — list them for the user to pick
+    pending.sort(key=lambda f: f.get("due_date", ""))
+    lines = [f"*{name}* has {len(pending)} pending follow-ups:\n"]
+    for i, fup in enumerate(pending, 1):
+        due = fup.get("due_date", "no date")
+        lines.append(f"  {i}. {fup.get('title', '')} (due {due})")
+    lines.append(f"\nReply with the number (1-{len(pending)}) to complete it.")
+
+    # Store the choices so handle_done_pick can resolve the reply
+    context.user_data["done_choices"] = pending
+    context.user_data["done_contact_name"] = name
+
+    await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
+
+
+async def handle_done_pick(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle a numeric reply to a /done multi-choice prompt."""
+    choices = context.user_data.get("done_choices")
+    if not choices:
+        return  # Not in a /done flow — ignore
+
+    text = update.message.text.strip()
+    if not text.isdigit():
+        # Clear state so we don't keep intercepting messages
+        context.user_data.pop("done_choices", None)
+        context.user_data.pop("done_contact_name", None)
+        return
+
+    pick = int(text)
+    name = context.user_data.get("done_contact_name", "")
+
+    # Clear state regardless of outcome
+    context.user_data.pop("done_choices", None)
+    context.user_data.pop("done_contact_name", None)
+
+    if pick < 1 or pick > len(choices):
+        await update.message.reply_text(f"Pick a number between 1 and {len(choices)}.")
+        return
+
+    fup = choices[pick - 1]
+    follow_ups_sheet.update(fup["id"], {
+        "status": "completed",
+        "completed_at": datetime.now(timezone.utc).isoformat(),
+    })
+    await update.message.reply_text(
+        f"✅ Completed: *{fup.get('title', '')}* — {name}",
         parse_mode="Markdown",
     )
 
