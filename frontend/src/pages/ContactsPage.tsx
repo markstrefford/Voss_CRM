@@ -14,10 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Trash2, Mail, Phone } from 'lucide-react';
-
-const SEGMENTS = ['', 'signal_strata', 'consulting', 'pe', 'other'] as const;
-const ENGAGEMENT_STAGES = ['new', 'nurturing', 'active', 'client', 'churned'] as const;
-const INBOUND_CHANNELS = ['', 'linkedin', 'referral', 'conference', 'cold_outbound', 'website', 'other'] as const;
+import { SEGMENTS, ENGAGEMENT_STAGES, INBOUND_CHANNELS } from '@/constants';
 
 export function ContactsPage() {
   const [contacts, setContacts] = useState<Contact[]>([]);

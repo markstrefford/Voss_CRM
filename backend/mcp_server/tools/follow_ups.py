@@ -2,6 +2,7 @@
 
 from datetime import datetime, timezone
 
+from app.helpers import group_follow_ups, today_str
 from app.services.sheet_service import follow_ups_sheet
 from mcp_server.helpers import resolve_contact_name
 
@@ -19,7 +20,7 @@ def get_follow_ups(
         contact_id: Filter by contact ID
     """
     fups = follow_ups_sheet.get_all()
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = today_str()
 
     if status and status != "all":
         fups = [f for f in fups if f.get("status") == status]
@@ -38,10 +39,10 @@ def get_follow_ups(
         label = "overdue follow-ups" if overdue_only else f"{status} follow-ups"
         return f"No {label} found."
 
-    # Split into overdue, today, and upcoming
-    overdue = [f for f in fups if f.get("due_date", "") < today and f.get("status") == "pending"]
-    todays = [f for f in fups if f.get("due_date", "") == today and f.get("status") == "pending"]
-    rest = [f for f in fups if f not in overdue and f not in todays]
+    groups = group_follow_ups(fups, today)
+    overdue = groups["overdue"]
+    todays = groups["today"]
+    rest = groups["upcoming"] + groups["completed"]
 
     lines = ["# Follow-ups\n"]
 

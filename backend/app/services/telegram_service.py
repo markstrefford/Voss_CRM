@@ -6,6 +6,7 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 
 from app.config import settings
+from app.helpers import contact_display_name, group_follow_ups, today_str
 from app.services.sheet_service import (
     companies_sheet,
     contacts_sheet,
@@ -71,11 +72,11 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_today(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = today_str()
     follow_ups = follow_ups_sheet.get_all({"status": "pending"})
-
-    overdue = [f for f in follow_ups if f.get("due_date", "") < today]
-    todays = [f for f in follow_ups if f.get("due_date", "") == today]
+    groups = group_follow_ups(follow_ups, today)
+    overdue = groups["overdue"]
+    todays = groups["today"]
 
     lines = ["*Today's Follow-ups*\n"]
 
@@ -83,34 +84,34 @@ async def cmd_today(update: Update, context: ContextTypes.DEFAULT_TYPE):
         lines.append(f"*Overdue ({len(overdue)}):*")
         for f in overdue[:10]:
             contact = contacts_sheet.get_by_id(f.get("contact_id", ""))
-            name = f"{contact['first_name']} {contact['last_name']}" if contact else "Unknown"
-            lines.append(f"  \u2757 {f.get('title', '')} — {name} (due {f.get('due_date', '')})")
+            name = contact_display_name(contact)
+            lines.append(f"  ❗ {f.get('title', '')} — {name} (due {f.get('due_date', '')})")
 
     if todays:
         lines.append(f"\n*Due Today ({len(todays)}):*")
         for f in todays:
             contact = contacts_sheet.get_by_id(f.get("contact_id", ""))
-            name = f"{contact['first_name']} {contact['last_name']}" if contact else "Unknown"
+            name = contact_display_name(contact)
             time_str = f" at {f['due_time']}" if f.get("due_time") else ""
-            lines.append(f"  \u2022 {f.get('title', '')} — {name}{time_str}")
+            lines.append(f"  • {f.get('title', '')} — {name}{time_str}")
 
     if not overdue and not todays:
-        lines.append("No follow-ups for today! \u2705")
+        lines.append("No follow-ups for today! ✅")
 
     await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
 
 
 async def cmd_note(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = " ".join(context.args) if context.args else ""
-    if not text or "\u2014" not in text and " - " not in text:
+    if not text or "—" not in text and " - " not in text:
         await update.message.reply_text(
-            "Usage: /note John Smith \u2014 great call, wants proposal\n"
+            "Usage: /note John Smith — great call, wants proposal\n"
             "Or: /note John Smith - great call, wants proposal"
         )
         return
 
     # Split on em-dash or regular dash
-    sep = "\u2014" if "\u2014" in text else " - "
+    sep = "—" if "—" in text else " - "
     parts = text.split(sep, 1)
     contact_name = parts[0].strip()
     note_body = parts[1].strip() if len(parts) > 1 else ""
@@ -144,8 +145,8 @@ async def cmd_note(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "occurred_at": datetime.now(timezone.utc).isoformat(),
     })
 
-    name = f"{contact['first_name']} {contact['last_name']}"
-    await update.message.reply_text(f"\u2705 Note added for *{name}*:\n_{note_body}_", parse_mode="Markdown")
+    name = contact_display_name(contact)
+    await update.message.reply_text(f"✅ Note added for *{name}*:\n_{note_body}_", parse_mode="Markdown")
 
 
 async def cmd_new(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -190,7 +191,7 @@ async def cmd_new(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "inbound_channel": inbound_channel,
     })
 
-    name = f"{first_name} {last_name}".strip()
+    name = contact_display_name(contact)
     company_str = f" at {company_name}" if company_name else ""
     role_str = f" ({role})" if role else ""
     extras = []
@@ -202,7 +203,7 @@ async def cmd_new(update: Update, context: ContextTypes.DEFAULT_TYPE):
         extras.append(inbound_channel)
     extras_str = f"\n{' · '.join(extras)}" if extras else ""
     await update.message.reply_text(
-        f"\u2705 Created contact: *{name}*{role_str}{company_str}{extras_str}\nID: `{contact['id']}`",
+        f"✅ Created contact: *{name}*{role_str}{company_str}{extras_str}\nID: `{contact['id']}`",
         parse_mode="Markdown",
     )
 
@@ -267,7 +268,7 @@ async def cmd_followup(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "status": "pending",
     })
 
-    name = f"{contact['first_name']} {contact['last_name']}"
+    name = contact_display_name(contact)
     time_str = f" at {due_time}" if due_time else ""
     await update.message.reply_text(
         f"✅ Follow-up scheduled for *{name}*:\n_{title}_\nDue: {due_date}{time_str}",
@@ -289,15 +290,15 @@ async def cmd_find(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if contacts:
         lines.append(f"*Contacts ({len(contacts)}):*")
         for c in contacts[:5]:
-            name = f"{c.get('first_name', '')} {c.get('last_name', '')}".strip()
+            name = contact_display_name(c)
             meta = " · ".join(filter(None, [c.get("segment"), c.get("engagement_stage")]))
             meta_str = f" [{meta}]" if meta else ""
-            lines.append(f"  \u2022 {name} — {c.get('role', '')} | {c.get('email', '')}{meta_str}")
+            lines.append(f"  • {name} — {c.get('role', '')} | {c.get('email', '')}{meta_str}")
 
     if companies:
         lines.append(f"\n*Companies ({len(companies)}):*")
         for co in companies[:5]:
-            lines.append(f"  \u2022 {co.get('name', '')} — {co.get('industry', '')}")
+            lines.append(f"  • {co.get('name', '')} — {co.get('industry', '')}")
 
     if not contacts and not companies:
         lines.append("No results found.")

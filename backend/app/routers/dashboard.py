@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends
 
 from app.dependencies import get_current_user
+from app.helpers import contact_display_name, today_str
 from app.services.sheet_service import (
     contacts_sheet,
     companies_sheet,
@@ -19,7 +20,7 @@ async def dashboard_summary(_user: dict = Depends(get_current_user)):
     deals = deals_sheet.get_all()
     follow_ups = follow_ups_sheet.get_all()
     interactions = interactions_sheet.get_all()
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = today_str()
 
     # Pipeline by stage
     stages = ["lead", "prospect", "qualified", "proposal", "negotiation", "won", "lost"]
@@ -99,7 +100,7 @@ def _days_ago_label(date_str: str, now: datetime) -> str:
 async def action_feed(_user: dict = Depends(get_current_user)):
     """Smart queues: surfaces who needs attention right now and why."""
     now = datetime.now(timezone.utc)
-    today = now.strftime("%Y-%m-%d")
+    today = today_str()
     week_ago = (now - timedelta(days=7)).isoformat()
     two_weeks_ago = (now - timedelta(days=14)).isoformat()
     end_of_week = (now + timedelta(days=(6 - now.weekday()))).strftime("%Y-%m-%d")
@@ -114,9 +115,6 @@ async def action_feed(_user: dict = Depends(get_current_user)):
     # Build lookup maps
     contact_map = {c["id"]: c for c in contacts}
     company_map = {c["id"]: c for c in companies}
-
-    def contact_name(c: dict) -> str:
-        return f"{c.get('first_name', '')} {c.get('last_name', '')}".strip()
 
     def company_name_for(contact: dict) -> str:
         cid = contact.get("company_id", "")
@@ -147,7 +145,7 @@ async def action_feed(_user: dict = Depends(get_current_user)):
         return {
             "id": f.get("id", ""),
             "contact_id": f.get("contact_id", ""),
-            "contact_name": contact_name(c),
+            "contact_name": contact_display_name(c),
             "company_name": company_name_for(c),
             "title": f.get("title", ""),
             "due_date": f.get("due_date", ""),
@@ -203,7 +201,7 @@ async def action_feed(_user: dict = Depends(get_current_user)):
             last_date = (last_ix.get("occurred_at", "") or last_ix.get("created_at", ""))[:10]
         return {
             "id": c.get("id", ""),
-            "name": contact_name(c),
+            "name": contact_display_name(c),
             "company_name": company_name_for(c),
             "role": c.get("role", ""),
             "engagement_stage": c.get("engagement_stage", ""),
@@ -275,7 +273,7 @@ async def action_feed(_user: dict = Depends(get_current_user)):
             stale_deals_list.append({
                 "id": d.get("id", ""),
                 "title": d.get("title", ""),
-                "contact_name": contact_name(c),
+                "contact_name": contact_display_name(c),
                 "company_name": company_name_for(c),
                 "stage": d.get("stage", ""),
                 "value": float(d.get("value") or 0),

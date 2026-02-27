@@ -2,6 +2,7 @@
 
 from datetime import datetime, timedelta, timezone
 
+from app.helpers import today_str
 from app.services.sheet_service import deals_sheet, follow_ups_sheet, interactions_sheet
 from mcp_server.helpers import resolve_contact_name, format_currency
 
@@ -11,7 +12,7 @@ def get_dashboard_summary() -> str:
     deals = deals_sheet.get_all()
     follow_ups = follow_ups_sheet.get_all()
     interactions = interactions_sheet.get_all()
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = today_str()
     week_ago = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
 
     # Pipeline

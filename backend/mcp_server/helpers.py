@@ -1,5 +1,6 @@
 """Shared helpers for MCP tool modules."""
 
+from app.helpers import contact_display_name
 from app.services.sheet_service import contacts_sheet, companies_sheet
 
 
@@ -8,11 +9,7 @@ def resolve_contact_name(contact_id: str) -> str:
     if not contact_id:
         return "Unknown"
     contact = contacts_sheet.get_by_id(contact_id)
-    if not contact:
-        return contact_id
-    first = contact.get("first_name", "")
-    last = contact.get("last_name", "")
-    return f"{first} {last}".strip() or contact_id
+    return contact_display_name(contact, fallback=contact_id)
 
 
 def resolve_company_name(company_id: str) -> str:

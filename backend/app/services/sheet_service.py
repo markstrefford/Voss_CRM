@@ -193,6 +193,10 @@ USERS_COLUMNS = [
     "id", "username", "password_hash", "telegram_chat_id", "created_at",
 ]
 
+SCHEDULER_LOG_COLUMNS = [
+    "id", "job_name", "last_run_date", "created_at",
+]
+
 # Pre-built service instances
 contacts_sheet = SheetService("Contacts", CONTACTS_COLUMNS)
 companies_sheet = SheetService("Companies", COMPANIES_COLUMNS)
@@ -200,3 +204,4 @@ deals_sheet = SheetService("Deals", DEALS_COLUMNS)
 interactions_sheet = SheetService("Interactions", INTERACTIONS_COLUMNS)
 follow_ups_sheet = SheetService("FollowUps", FOLLOW_UPS_COLUMNS)
 users_sheet = SheetService("Users", USERS_COLUMNS)
+scheduler_log_sheet = SheetService("SchedulerLog", SCHEDULER_LOG_COLUMNS)

@@ -13,12 +13,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TagInput } from '@/components/shared/TagInput';
 import { EmailDraftModal } from '@/components/email/EmailDraftModal';
-import { ArrowLeft, Edit, Save, X, Plus, Mail, Check, Clock, CalendarPlus, ChevronDown, ChevronRight } from 'lucide-react';
+import { FollowUpSection } from '@/components/shared/FollowUpSection';
+import { SnoozeDialog } from '@/components/shared/SnoozeDialog';
+import { SEGMENTS, ENGAGEMENT_STAGES, INBOUND_CHANNELS } from '@/constants';
+import { ArrowLeft, Edit, Save, X, Plus, Mail, Clock, ChevronDown, ChevronRight } from 'lucide-react';
 import { format } from 'date-fns';
-
-const SEGMENTS = ['', 'signal_strata', 'consulting', 'pe', 'other'] as const;
-const ENGAGEMENT_STAGES = ['new', 'nurturing', 'active', 'client', 'churned'] as const;
-const INBOUND_CHANNELS = ['', 'linkedin', 'referral', 'conference', 'cold_outbound', 'website', 'other'] as const;
 
 export function ContactDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -271,19 +270,13 @@ export function ContactDetailPage() {
             onSaved={() => loadFollowUps(id!)}
           />
 
-          <Dialog open={!!snoozeId} onOpenChange={() => setSnoozeId(null)}>
-            <DialogContent>
-              <DialogHeader><DialogTitle>Snooze Follow-up</DialogTitle></DialogHeader>
-              <div className="space-y-2">
-                <Label>New Due Date</Label>
-                <Input type="date" value={snoozeDate} onChange={e => setSnoozeDate(e.target.value)} />
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setSnoozeId(null)}>Cancel</Button>
-                <Button onClick={handleSnooze} disabled={!snoozeDate}>Snooze</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+          <SnoozeDialog
+            open={!!snoozeId}
+            onOpenChange={() => setSnoozeId(null)}
+            snoozeDate={snoozeDate}
+            onSnoozeDateChange={setSnoozeDate}
+            onConfirm={handleSnooze}
+          />
         </TabsContent>
       </Tabs>
 
@@ -353,48 +346,6 @@ function InteractionFormDialog({ open, onOpenChange, contactId, onSaved }: { ope
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  );
-}
-
-function FollowUpSection({ title, items, variant, onComplete, onSnooze }: {
-  title: string;
-  items: FollowUp[];
-  variant: 'default' | 'destructive' | 'secondary' | 'outline';
-  onComplete: (id: string) => void;
-  onSnooze: (id: string) => void;
-}) {
-  if (items.length === 0) return null;
-
-  return (
-    <div className="space-y-2">
-      <h2 className="text-lg font-semibold flex items-center gap-2">
-        {title} <Badge variant={variant}>{items.length}</Badge>
-      </h2>
-      <div className="space-y-2">
-        {items.map(f => (
-          <Card key={f.id}>
-            <CardContent className="pt-4 flex items-center justify-between">
-              <div>
-                <p className="font-medium">{f.title}</p>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-                  <Clock className="h-3 w-3" />
-                  {f.due_date} {f.due_time && `at ${f.due_time}`}
-                </div>
-                {f.notes && <p className="text-sm text-muted-foreground mt-1">{f.notes}</p>}
-              </div>
-              <div className="flex gap-1">
-                <Button variant="ghost" size="icon" title="Complete" onClick={() => onComplete(f.id)}>
-                  <Check className="h-4 w-4 text-green-600" />
-                </Button>
-                <Button variant="ghost" size="icon" title="Snooze" onClick={() => onSnooze(f.id)}>
-                  <CalendarPlus className="h-4 w-4" />
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    </div>
   );
 }
 
