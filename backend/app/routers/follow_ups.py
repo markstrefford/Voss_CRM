@@ -12,12 +12,15 @@ router = APIRouter(prefix="/api/follow-ups", tags=["follow-ups"])
 @router.get("", response_model=list[FollowUp])
 async def list_follow_ups(
     status_filter: str | None = Query(None, alias="status"),
+    contact_id: str | None = Query(None),
     overdue: bool | None = Query(None),
     _user: dict = Depends(get_current_user),
 ):
     filters = {}
     if status_filter:
         filters["status"] = status_filter
+    if contact_id:
+        filters["contact_id"] = contact_id
     records = follow_ups_sheet.get_all(filters or None)
 
     if overdue:

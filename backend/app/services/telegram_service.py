@@ -27,6 +27,7 @@ async def get_telegram_app() -> Application | None:
     if _app is None:
         _app = Application.builder().token(settings.telegram_bot_token).build()
         _app.add_handler(CommandHandler("start", cmd_start))
+        _app.add_handler(CommandHandler("help", cmd_help))
         _app.add_handler(CommandHandler("today", cmd_today))
         _app.add_handler(CommandHandler("note", cmd_note))
         _app.add_handler(CommandHandler("new", cmd_new))
@@ -70,6 +71,21 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"/followup Name — title, 2026-03-01\n"
         f"/new Name, Company, Role\n"
         f"/pipeline — deal summary",
+        parse_mode="Markdown",
+    )
+
+
+async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "*Voss CRM Commands*\n\n"
+        "/today — today's follow-ups & overdue\n"
+        "/done Name — complete a follow-up\n"
+        "/followup Name — title, date — schedule follow-up\n"
+        "/note Name — note text — log an interaction\n"
+        "/new Name, Company, Role — create contact\n"
+        "/find query — search contacts & companies\n"
+        "/pipeline — deal summary\n"
+        "/help — show this message",
         parse_mode="Markdown",
     )
 

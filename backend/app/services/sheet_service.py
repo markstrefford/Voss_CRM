@@ -197,6 +197,17 @@ SCHEDULER_LOG_COLUMNS = [
     "id", "job_name", "last_run_date", "created_at",
 ]
 
+# Lookup used by sheets.py to auto-create tabs with correct headers
+_COLUMNS_BY_TAB = {
+    "Contacts": CONTACTS_COLUMNS,
+    "Companies": COMPANIES_COLUMNS,
+    "Deals": DEALS_COLUMNS,
+    "Interactions": INTERACTIONS_COLUMNS,
+    "FollowUps": FOLLOW_UPS_COLUMNS,
+    "Users": USERS_COLUMNS,
+    "SchedulerLog": SCHEDULER_LOG_COLUMNS,
+}
+
 # Pre-built service instances
 contacts_sheet = SheetService("Contacts", CONTACTS_COLUMNS)
 companies_sheet = SheetService("Companies", COMPANIES_COLUMNS)
