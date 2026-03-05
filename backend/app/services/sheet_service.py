@@ -20,6 +20,13 @@ class SheetService:
     def _worksheet(self):
         return get_worksheet(self.tab_name)
 
+    def _sheet_columns(self, ws=None):
+        """Read actual header row from the sheet to use for positional writes."""
+        if ws is None:
+            ws = self._worksheet()
+        headers = ws.row_values(1)
+        return headers if headers else self.columns
+
     def _get_all_records(self, force_refresh: bool = False) -> list[dict]:
         cache_key = f"{self.tab_name}_all"
         if not force_refresh and cache_key in _cache:
@@ -92,9 +99,10 @@ class SheetService:
                     record[key] = str(value) if value is not None else ""
 
             records.append(record)
-            rows.append([record.get(col, "") for col in self.columns])
 
         ws = self._worksheet()
+        sheet_cols = self._sheet_columns(ws)
+        rows = [[record.get(col, "") for col in sheet_cols] for record in records]
         ws.append_rows(rows, value_input_option="USER_ENTERED")
         self._invalidate_cache()
         return records
@@ -111,7 +119,8 @@ class SheetService:
                 record[key] = str(value) if value is not None else ""
 
         ws = self._worksheet()
-        row = [record.get(col, "") for col in self.columns]
+        sheet_cols = self._sheet_columns(ws)
+        row = [record.get(col, "") for col in sheet_cols]
         ws.append_row(row, value_input_option="USER_ENTERED")
         self._invalidate_cache()
         return record
@@ -138,8 +147,9 @@ class SheetService:
         if "updated_at" in self.columns:
             record["updated_at"] = self._now()
 
-        row = [record.get(col, "") for col in self.columns]
-        ws.update(f"A{row_index}:{chr(64 + len(self.columns))}{row_index}", [row])
+        sheet_cols = self._sheet_columns(ws)
+        row = [record.get(col, "") for col in sheet_cols]
+        ws.update(f"A{row_index}:{chr(64 + len(sheet_cols))}{row_index}", [row])
         self._invalidate_cache()
         return record
 
@@ -162,7 +172,7 @@ class SheetService:
 # Column definitions for each tab
 CONTACTS_COLUMNS = [
     "id", "company_id", "first_name", "last_name", "email", "phone",
-    "role", "linkedin_url", "urls", "source", "referral_contact_id",
+    "role", "linkedin_url", "platform_handles", "urls", "source", "referral_contact_id",
     "tags", "notes", "status",
     "segment", "engagement_stage", "inbound_channel", "do_not_contact", "campaign_id",
     "created_at", "updated_at",

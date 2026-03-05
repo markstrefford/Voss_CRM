@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: voss-instagram-listener
+    runtime: python
+    rootDir: ingest/instagram
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: META_APP_ID
+        sync: false
+      - key: META_APP_SECRET
+        sync: false
+      - key: META_ACCESS_TOKEN
+        sync: false
+      - key: META_VERIFY_TOKEN
+        sync: false
+      - key: INSTAGRAM_ACCOUNT_ID
+        sync: false
+      - key: VOSS_API_URL
+        sync: false
+      - key: VOSS_API_KEY
+        sync: false
+    healthCheckPath: /health

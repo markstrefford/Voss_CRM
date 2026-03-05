@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     telegram_bot_token: str = ""
     telegram_enabled: bool = False
 
+    # API key (service-to-service auth)
+    voss_api_key: str = ""
+
     # CORS
     cors_origins: str = "http://localhost:5173"
 

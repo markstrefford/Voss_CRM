@@ -154,6 +154,23 @@ export function ContactDetailPage() {
                   <InfoRow label="Phone" value={contact.phone} />
                   <InfoRow label="Role" value={contact.role} />
                   <InfoRow label="LinkedIn" value={contact.linkedin_url} link />
+                  {contact.platform_handles && (() => {
+                    try {
+                      const handles = JSON.parse(contact.platform_handles);
+                      return Object.keys(handles).length > 0 ? (
+                        <div>
+                          <p className="text-sm text-muted-foreground">Platform Handles</p>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {Object.entries(handles).map(([platform, handle]) => (
+                              <Badge key={platform} variant="secondary">
+                                {platform}: {String(handle)}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null;
+                    } catch { return null; }
+                  })()}
                   <InfoRow label="Source" value={contact.source} />
                   <InfoRow label="Status" value={contact.status} />
                   <InfoRow label="Segment" value={contact.segment} />

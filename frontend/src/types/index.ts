@@ -7,6 +7,7 @@ export interface Contact {
   phone: string;
   role: string;
   linkedin_url: string;
+  platform_handles: string;
   urls: string;
   source: string;
   referral_contact_id: string;

@@ -1,6 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
+import json
+
 from app.dependencies import get_current_user
+from app.helpers import parse_platform_handles
 from app.models import Contact, ContactCreate, ContactFromLinkedIn, ContactUpdate
 from app.services.sheet_service import companies_sheet, contacts_sheet
 
@@ -20,7 +23,7 @@ async def list_contacts(
     if q:
         records = contacts_sheet.search(q, [
             "first_name", "last_name", "email", "company_id", "tags", "notes",
-            "segment", "engagement_stage",
+            "segment", "engagement_stage", "platform_handles",
         ])
     else:
         filters = {}
@@ -97,6 +100,10 @@ async def create_from_linkedin(
         # Update existing contact with new data
         update_data = body.model_dump(exclude={"company_name"})
         update_data = {k: v for k, v in update_data.items() if v}
+        # Ensure platform_handles includes linkedin
+        handles = parse_platform_handles(existing.get("platform_handles", ""))
+        handles["linkedin"] = body.linkedin_url
+        update_data["platform_handles"] = json.dumps(handles)
         record = contacts_sheet.update(existing["id"], update_data)
         return record
 
@@ -115,8 +122,10 @@ async def create_from_linkedin(
         "last_name": body.last_name,
         "role": body.role,
         "linkedin_url": body.linkedin_url,
+        "platform_handles": json.dumps({"linkedin": body.linkedin_url}),
         "email": body.email,
         "phone": body.phone,
+        "notes": body.notes,
         "company_id": company_id,
         "source": "linkedin",
     })

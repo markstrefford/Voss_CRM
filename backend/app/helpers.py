@@ -1,5 +1,6 @@
 """Shared helper functions for the Voss CRM backend."""
 
+import json
 from datetime import datetime, timezone
 
 
@@ -14,6 +15,28 @@ def contact_display_name(contact: dict | None, fallback: str = "Unknown") -> str
     last = contact.get("last_name", "")
     name = f"{first} {last}".strip()
     return name or fallback
+
+
+def parse_platform_handles(raw: str) -> dict:
+    """Parse JSON platform_handles string, return empty dict on failure."""
+    if not raw:
+        return {}
+    try:
+        result = json.loads(raw)
+        return result if isinstance(result, dict) else {}
+    except (json.JSONDecodeError, TypeError):
+        return {}
+
+
+def find_contact_by_handle(contacts_sheet, platform: str, handle: str) -> dict | None:
+    """Search all contacts for a matching platform handle."""
+    handle_lower = handle.lower().rstrip("/")
+    for contact in contacts_sheet.get_all():
+        handles = parse_platform_handles(contact.get("platform_handles", ""))
+        stored = handles.get(platform, "").lower().rstrip("/")
+        if stored and stored == handle_lower:
+            return contact
+    return None
 
 
 def today_str() -> str:

@@ -1,3 +1,4 @@
+import json
 import logging
 import re
 from datetime import datetime, timezone
@@ -6,7 +7,7 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
 
 from app.config import settings
-from app.helpers import contact_display_name, group_follow_ups, today_str
+from app.helpers import contact_display_name, group_follow_ups, parse_platform_handles, today_str
 from app.services.sheet_service import (
     companies_sheet,
     contacts_sheet,
@@ -34,7 +35,8 @@ async def get_telegram_app() -> Application | None:
         _app.add_handler(CommandHandler("find", cmd_find))
         _app.add_handler(CommandHandler("followup", cmd_followup))
         _app.add_handler(CommandHandler("done", cmd_done))
-        _app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_done_pick))
+        _app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_reply))
+        _app.add_handler(CommandHandler("link", cmd_link))
         _app.add_handler(CommandHandler("pipeline", cmd_pipeline))
         await _app.initialize()
         await _app.start()
@@ -70,6 +72,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"/note Name — note text\n"
         f"/followup Name — title, 2026-03-01\n"
         f"/new Name, Company, Role\n"
+        f"/link @handle Name — link social handle\n"
         f"/pipeline — deal summary",
         parse_mode="Markdown",
     )
@@ -84,6 +87,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/note Name — note text — log an interaction\n"
         "/new Name, Company, Role — create contact\n"
         "/find query — search contacts & companies\n"
+        "/link @handle Name — link social handle to contact\n"
         "/pipeline — deal summary\n"
         "/help — show this message",
         parse_mode="Markdown",
@@ -355,15 +359,34 @@ async def cmd_done(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
 
 
-async def handle_done_pick(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_text_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle text replies for /done multi-choice and pending link prompts."""
+    # Check /done flow first
+    choices = context.user_data.get("done_choices")
+    if choices:
+        await _handle_done_pick(update, context)
+        return
+
+    # Check pending link flow (stored in bot_data by notify_pending_link)
+    pending = context.bot_data.get("pending_link")
+    if pending and str(update.effective_chat.id) == str(pending.get("chat_id")):
+        context.user_data["pending_link"] = pending
+        context.bot_data.pop("pending_link", None)
+        await _handle_pending_link_reply(update, context)
+        return
+
+    # Also check user_data (for re-tries after invalid replies)
+    pending = context.user_data.get("pending_link")
+    if pending:
+        await _handle_pending_link_reply(update, context)
+        return
+
+
+async def _handle_done_pick(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle a numeric reply to a /done multi-choice prompt."""
     choices = context.user_data.get("done_choices")
-    if not choices:
-        return  # Not in a /done flow — ignore
-
     text = update.message.text.strip()
     if not text.isdigit():
-        # Clear state so we don't keep intercepting messages
         context.user_data.pop("done_choices", None)
         context.user_data.pop("done_contact_name", None)
         return
@@ -371,7 +394,6 @@ async def handle_done_pick(update: Update, context: ContextTypes.DEFAULT_TYPE):
     pick = int(text)
     name = context.user_data.get("done_contact_name", "")
 
-    # Clear state regardless of outcome
     context.user_data.pop("done_choices", None)
     context.user_data.pop("done_contact_name", None)
 
@@ -388,6 +410,180 @@ async def handle_done_pick(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"✅ Completed: *{fup.get('title', '')}* — {name}",
         parse_mode="Markdown",
     )
+
+
+async def _handle_pending_link_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle Link/New/Ignore reply for pending platform link."""
+    pending = context.user_data.get("pending_link")
+    if not pending:
+        return
+
+    text = update.message.text.strip().lower()
+    contact_id = pending.get("contact_id")
+    handle = pending.get("handle")
+    platform = pending.get("platform")
+    contact_name = pending.get("contact_name")
+
+    # Clear state
+    context.user_data.pop("pending_link", None)
+
+    if text in ("1", "link", "yes"):
+        # Link the handle to existing contact
+        contact = contacts_sheet.get_by_id(contact_id)
+        if contact:
+            handles = parse_platform_handles(contact.get("platform_handles", ""))
+            handles[platform] = handle
+            contacts_sheet.update(contact_id, {"platform_handles": json.dumps(handles)})
+            await update.message.reply_text(
+                f"✅ Linked {platform.title()} {handle} to *{contact_name}*\n"
+                f"Future {platform.title()} interactions will log against this contact.",
+                parse_mode="Markdown",
+            )
+        else:
+            await update.message.reply_text("Contact not found — may have been deleted.")
+
+    elif text in ("2", "new"):
+        # Create new contact
+        name_parts = (pending.get("display_name") or handle).split()
+        first_name = name_parts[0] if name_parts else handle
+        last_name = " ".join(name_parts[1:]) if len(name_parts) > 1 else ""
+        new_contact = contacts_sheet.create({
+            "first_name": first_name,
+            "last_name": last_name,
+            "platform_handles": json.dumps({platform: handle}),
+            "tags": platform,
+            "source": f"{platform}_organic",
+            "engagement_stage": "new",
+        })
+        await update.message.reply_text(
+            f"✅ Created new contact: *{contact_display_name(new_contact)}* with {platform.title()} handle {handle}",
+            parse_mode="Markdown",
+        )
+
+    elif text in ("3", "ignore"):
+        await update.message.reply_text("Noted — interaction logged without linking.")
+
+    else:
+        await update.message.reply_text("Reply with 1 (Link), 2 (New), or 3 (Ignore).")
+        # Re-set the pending state so they can try again
+        context.user_data["pending_link"] = pending
+
+
+async def cmd_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Link a platform handle to an existing contact.
+
+    Usage: /link @handle Name
+    Example: /link @sarahchen_ Sarah Chen
+    """
+    text = " ".join(context.args) if context.args else ""
+    if not text:
+        await update.message.reply_text(
+            "Usage: /link @handle Name\n"
+            "Example: /link @sarahchen\\_ Sarah Chen"
+        )
+        return
+
+    # Parse: first arg is handle, rest is name
+    parts = text.split(None, 1)
+    handle = parts[0]
+    contact_name = parts[1] if len(parts) > 1 else ""
+
+    if not contact_name:
+        await update.message.reply_text("Please provide both handle and contact name.")
+        return
+
+    # Detect platform from handle format
+    if handle.startswith("@"):
+        platform = "instagram"
+    elif "linkedin.com" in handle:
+        platform = "linkedin"
+    else:
+        platform = "instagram"  # Default
+
+    # Search for contact by name
+    name_parts = contact_name.split()
+    contacts = contacts_sheet.search(name_parts[0], ["first_name", "last_name"])
+    if len(name_parts) > 1:
+        contacts = [
+            c for c in contacts
+            if name_parts[-1].lower() in c.get("last_name", "").lower()
+        ]
+
+    if not contacts:
+        await update.message.reply_text(f"Contact '{contact_name}' not found.")
+        return
+
+    contact = contacts[0]
+    handles = parse_platform_handles(contact.get("platform_handles", ""))
+    handles[platform] = handle
+    contacts_sheet.update(contact["id"], {"platform_handles": json.dumps(handles)})
+
+    name = contact_display_name(contact)
+    escaped_handle = handle.replace("_", "\\_")
+    await update.message.reply_text(
+        f"✅ Linked {platform.title()} {escaped_handle} to *{name}*\n"
+        f"Future {platform.title()} interactions will log against this contact.",
+        parse_mode="Markdown",
+    )
+
+
+async def notify_pending_link(event, contact: dict):
+    """Send a Telegram notification when a social capture has a pending link (name match, no handle match).
+
+    Called from the social capture endpoint.
+    """
+    from app.services.sheet_service import users_sheet
+
+    # Find users with telegram_chat_id set
+    users = users_sheet.get_all()
+    chat_ids = [u["telegram_chat_id"] for u in users if u.get("telegram_chat_id")]
+
+    if not chat_ids:
+        return
+
+    person = event.person
+    handle = person.handle
+    display_name = person.display_name
+    platform = event.platform
+    action = event.action
+    contact_name = contact_display_name(contact)
+
+    text_preview = ""
+    if event.text:
+        text_preview = f": '{event.text[:60]}'"
+    post_ref = ""
+    if event.content_ref.post_title:
+        post_ref = f" on '{event.content_ref.post_title}'"
+
+    escaped_handle = str(handle).replace("_", "\\_")
+    msg = (
+        f"🔗 New {platform.title()} interaction from {escaped_handle}\n"
+        f"({action}{post_ref}{text_preview})\n\n"
+        f"Possible match: *{contact_name}*\n\n"
+        f"Reply:\n"
+        f"  1️⃣ Link — add handle to existing contact\n"
+        f"  2️⃣ New — create separate contact\n"
+        f"  3️⃣ Ignore — log without linking"
+    )
+
+    for chat_id in chat_ids:
+        try:
+            await send_message(chat_id, msg)
+            # Store pending link state — this works for the first user who replies
+            # For multi-user, we'd need per-user state, but VOSS is single-user
+            app = await get_telegram_app()
+            if app:
+                # Store in application-level data for the next text reply
+                app.bot_data["pending_link"] = {
+                    "contact_id": contact["id"],
+                    "handle": str(handle),
+                    "platform": platform,
+                    "contact_name": contact_name,
+                    "display_name": display_name,
+                    "chat_id": chat_id,
+                }
+        except Exception as e:
+            logger.error(f"Failed to send pending link notification: {e}")
 
 
 async def cmd_find(update: Update, context: ContextTypes.DEFAULT_TYPE):

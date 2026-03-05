@@ -1,0 +1,184 @@
+/* Voss Engagement Capture Panel — injected on LinkedIn notifications/feed pages */
+
+#voss-engagement-panel {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 10000;
+  width: 340px;
+  max-height: 450px;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.voss-panel-header {
+  display: flex;
+  align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid #eee;
+  background: #f8f9fa;
+  flex-shrink: 0;
+}
+
+.voss-panel-title {
+  font-weight: 700;
+  font-size: 14px;
+  color: #0073b1;
+}
+
+.voss-panel-count {
+  margin-left: 6px;
+  color: #666;
+  font-size: 12px;
+}
+
+.voss-panel-toggle {
+  margin-left: auto;
+  background: none;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  color: #666;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.voss-panel-toggle:hover {
+  background: #eee;
+}
+
+#voss-panel-body {
+  overflow-y: auto;
+  max-height: 280px;
+  flex: 1;
+}
+
+.voss-empty {
+  padding: 16px;
+  color: #888;
+  text-align: center;
+  font-size: 12px;
+}
+
+.voss-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 14px;
+  border-bottom: 1px solid #f0f0f0;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.voss-item:hover {
+  background: #f5f8fa;
+}
+
+.voss-item-captured {
+  opacity: 0.5;
+}
+
+.voss-item-check {
+  margin-top: 3px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.voss-item-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.voss-item-name {
+  font-weight: 600;
+  color: #333;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.voss-item-time {
+  font-weight: 400;
+  color: #999;
+  font-size: 11px;
+  margin-left: 4px;
+}
+
+.voss-item-action {
+  color: #666;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.voss-badge-done {
+  color: #2e7d32;
+  font-size: 11px;
+}
+
+.voss-panel-actions {
+  display: flex;
+  gap: 8px;
+  padding: 10px 14px;
+  border-top: 1px solid #eee;
+  flex-shrink: 0;
+}
+
+.voss-btn {
+  flex: 1;
+  padding: 8px;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.voss-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.voss-btn-primary {
+  background: #0073b1;
+  color: white;
+}
+
+.voss-btn-primary:hover:not(:disabled) {
+  background: #005a8c;
+}
+
+.voss-btn-secondary {
+  background: #f0f0f0;
+  color: #333;
+}
+
+.voss-btn-secondary:hover:not(:disabled) {
+  background: #e0e0e0;
+}
+
+.voss-panel-status {
+  display: none;
+  padding: 8px 14px;
+  font-size: 12px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.voss-status-info { background: #e3f2fd; color: #1565c0; }
+.voss-status-success { background: #e8f5e9; color: #2e7d32; }
+.voss-status-error { background: #fbe9e7; color: #c62828; }

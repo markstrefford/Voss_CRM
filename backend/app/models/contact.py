@@ -9,6 +9,7 @@ class ContactCreate(BaseModel):
     phone: str = ""
     role: str = ""
     linkedin_url: str = ""
+    platform_handles: str = ""
     urls: str = ""
     source: str = "other"
     referral_contact_id: str = ""
@@ -30,6 +31,7 @@ class ContactUpdate(BaseModel):
     phone: str | None = None
     role: str | None = None
     linkedin_url: str | None = None
+    platform_handles: str | None = None
     urls: str | None = None
     source: str | None = None
     referral_contact_id: str | None = None
@@ -51,6 +53,7 @@ class ContactFromLinkedIn(BaseModel):
     linkedin_url: str = Field(..., min_length=1)
     email: str = ""
     phone: str = ""
+    notes: str = ""
 
 
 class Contact(BaseModel):
@@ -62,6 +65,7 @@ class Contact(BaseModel):
     phone: str = ""
     role: str = ""
     linkedin_url: str = ""
+    platform_handles: str = ""
     urls: str = ""
     source: str = ""
     referral_contact_id: str = ""
