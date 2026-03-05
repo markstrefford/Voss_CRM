@@ -15,18 +15,9 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://www.linkedin.com/in/*"],
-      "js": ["content/linkedin-scraper.js"],
-      "css": ["content/linkedin-scraper.css"]
-    },
-    {
-      "matches": [
-        "https://www.linkedin.com/notifications*",
-        "https://www.linkedin.com/feed/update/*",
-        "https://www.linkedin.com/messaging/*"
-      ],
-      "js": ["content/linkedin-engagement.js"],
-      "css": ["content/linkedin-engagement.css"]
+      "matches": ["https://www.linkedin.com/*"],
+      "js": ["content/linkedin-scraper.js", "content/linkedin-engagement.js"],
+      "css": ["content/linkedin-scraper.css", "content/linkedin-engagement.css"]
     }
   ],
   "background": {
