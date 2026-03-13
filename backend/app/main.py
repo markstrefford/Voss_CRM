@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import auth, companies, contacts, deals, email_draft, follow_ups, interactions, social
+from app.routers import auth, companies, contacts, deals, email_draft, follow_ups, interactions, notifications, social
 from app.routers import dashboard
 
 logging.basicConfig(level=logging.INFO)
@@ -65,6 +65,7 @@ app.include_router(deals.router)
 app.include_router(interactions.router)
 app.include_router(follow_ups.router)
 app.include_router(dashboard.router)
+app.include_router(notifications.router)
 app.include_router(email_draft.router)
 app.include_router(social.router)
 

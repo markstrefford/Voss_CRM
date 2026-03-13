@@ -14,6 +14,7 @@ from app.services.sheet_service import (
     deals_sheet,
     follow_ups_sheet,
     interactions_sheet,
+    notifications_sheet,
 )
 
 logger = logging.getLogger(__name__)
@@ -360,7 +361,7 @@ async def cmd_done(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def handle_text_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle text replies for /done multi-choice and pending link prompts."""
+    """Handle text replies for /done multi-choice, pending link, and deal suggestion prompts."""
     # Check /done flow first
     choices = context.user_data.get("done_choices")
     if choices:
@@ -379,6 +380,20 @@ async def handle_text_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     pending = context.user_data.get("pending_link")
     if pending:
         await _handle_pending_link_reply(update, context)
+        return
+
+    # Check deal suggestion flow (stored in bot_data by notify_deal_suggestion)
+    deal_sug = context.bot_data.get("pending_deal_suggestion")
+    if deal_sug and str(update.effective_chat.id) == str(deal_sug.get("chat_id")):
+        context.user_data["pending_deal_suggestion"] = deal_sug
+        context.bot_data.pop("pending_deal_suggestion", None)
+        await _handle_deal_suggestion_reply(update, context)
+        return
+
+    # Also check user_data (for re-tries after invalid replies)
+    deal_sug = context.user_data.get("pending_deal_suggestion")
+    if deal_sug:
+        await _handle_deal_suggestion_reply(update, context)
         return
 
 
@@ -614,6 +629,106 @@ async def cmd_find(update: Update, context: ContextTypes.DEFAULT_TYPE):
         lines.append("No results found.")
 
     await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
+
+
+async def notify_deal_suggestion(contact_id: str, title: str, notes: str = "", notification_id: str = ""):
+    """Send an actionable Telegram notification when a deal-worthy interaction is logged."""
+    from app.services.sheet_service import users_sheet
+
+    try:
+        contact = contacts_sheet.get_by_id(contact_id)
+        name = contact_display_name(contact, fallback="Unknown")
+        company_id = contact.get("company_id", "") if contact else ""
+
+        msg = (
+            f"💡 *Deal opportunity detected*\n\n"
+            f"_{title}_\n"
+            f"Contact: {name}\n\n"
+            f"Reply:\n"
+            f"  1️⃣ Create deal\n"
+            f"  2️⃣ Create follow-up\n"
+            f"  3️⃣ Ignore"
+        )
+
+        chat_ids = [
+            u["telegram_chat_id"]
+            for u in users_sheet.get_all()
+            if u.get("telegram_chat_id")
+        ]
+
+        for chat_id in chat_ids:
+            await send_message(chat_id, msg)
+            app = await get_telegram_app()
+            if app:
+                app.bot_data["pending_deal_suggestion"] = {
+                    "contact_id": contact_id,
+                    "company_id": company_id,
+                    "title": title,
+                    "notes": notes,
+                    "notification_id": notification_id,
+                    "chat_id": chat_id,
+                }
+    except Exception as e:
+        logger.error(f"Failed to send deal suggestion notification: {e}")
+
+
+async def _handle_deal_suggestion_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle 1/2/3 reply for deal suggestion prompt."""
+    pending = context.user_data.get("pending_deal_suggestion")
+    if not pending:
+        return
+
+    text = update.message.text.strip().lower()
+    contact_id = pending.get("contact_id", "")
+    company_id = pending.get("company_id", "")
+    title = pending.get("title", "")
+    notes = pending.get("notes", "")
+    notification_id = pending.get("notification_id", "")
+
+    # Clear state
+    context.user_data.pop("pending_deal_suggestion", None)
+
+    now = datetime.now(timezone.utc).isoformat()
+
+    if text in ("1", "deal", "create deal"):
+        deals_sheet.create({
+            "title": title,
+            "contact_id": contact_id,
+            "company_id": company_id,
+            "stage": "lead",
+            "priority": "medium",
+            "notes": notes,
+        })
+        if notification_id:
+            notifications_sheet.update(notification_id, {"status": "accepted", "resolved_at": now})
+        await update.message.reply_text(
+            f"✅ Deal created: *{title}*\nStage: lead",
+            parse_mode="Markdown",
+        )
+
+    elif text in ("2", "follow-up", "followup"):
+        follow_ups_sheet.create({
+            "contact_id": contact_id,
+            "title": f"Review deal: {title}",
+            "due_date": today_str(),
+            "status": "pending",
+        })
+        if notification_id:
+            notifications_sheet.update(notification_id, {"status": "follow_up", "resolved_at": now})
+        await update.message.reply_text(
+            f"✅ Follow-up created: *Review deal: {title}*\nDue: today",
+            parse_mode="Markdown",
+        )
+
+    elif text in ("3", "ignore"):
+        if notification_id:
+            notifications_sheet.update(notification_id, {"status": "dismissed", "resolved_at": now})
+        await update.message.reply_text("Got it, ignored.")
+
+    else:
+        await update.message.reply_text("Reply with 1 (Create deal), 2 (Create follow-up), or 3 (Ignore).")
+        # Re-set state for retry
+        context.user_data["pending_deal_suggestion"] = pending
 
 
 async def cmd_pipeline(update: Update, context: ContextTypes.DEFAULT_TYPE):

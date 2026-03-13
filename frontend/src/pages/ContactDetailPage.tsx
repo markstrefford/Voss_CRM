@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getContact, updateContact, getInteractions, createInteraction, getDeals, getFollowUps, createFollowUp, completeFollowUp, snoozeFollowUp } from '@/api';
-import type { Contact, Interaction, Deal, FollowUp } from '@/types';
+import { getContact, updateContact, getInteractions, createInteraction, getDeals, createDeal, getFollowUps, createFollowUp, completeFollowUp, snoozeFollowUp, getNotifications, resolveNotification } from '@/api';
+import type { Contact, Interaction, Deal, FollowUp, NotificationItem } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -15,7 +15,7 @@ import { TagInput } from '@/components/shared/TagInput';
 import { EmailDraftModal } from '@/components/email/EmailDraftModal';
 import { FollowUpSection } from '@/components/shared/FollowUpSection';
 import { SnoozeDialog } from '@/components/shared/SnoozeDialog';
-import { SEGMENTS, ENGAGEMENT_STAGES, INBOUND_CHANNELS } from '@/constants';
+import { SEGMENTS, ENGAGEMENT_STAGES, INBOUND_CHANNELS, formatCurrency } from '@/constants';
 import { ArrowLeft, Edit, Save, X, Plus, Mail, Clock, ChevronDown, ChevronRight } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -34,14 +34,30 @@ export function ContactDetailPage() {
   const [snoozeId, setSnoozeId] = useState<string | null>(null);
   const [snoozeDate, setSnoozeDate] = useState('');
   const [showCompleted, setShowCompleted] = useState(false);
+  const [showDealForm, setShowDealForm] = useState(false);
+  const [pendingNotifications, setPendingNotifications] = useState<NotificationItem[]>([]);
+  const [activeSuggestion, setActiveSuggestion] = useState<NotificationItem | null>(null);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     if (!id) return;
-    getContact(id).then(res => { setContact(res.data); setEditForm(res.data); });
+    getContact(id)
+      .then(res => { setContact(res.data); setEditForm(res.data); })
+      .catch(() => setError(true));
     getInteractions({ contact_id: id }).then(res => setInteractions(res.data));
-    getDeals({ contact_id: id }).then(res => setDeals(res.data));
+    loadDeals(id);
     loadFollowUps(id);
+    loadNotifications(id);
   }, [id]);
+
+  const loadNotifications = (contactId: string) => {
+    getNotifications({ status: 'pending', contact_id: contactId })
+      .then(res => setPendingNotifications(res.data));
+  };
+
+  const loadDeals = (contactId: string) => {
+    getDeals({ contact_id: contactId }).then(res => setDeals(res.data));
+  };
 
   const loadFollowUps = (contactId: string) => {
     getFollowUps({ contact_id: contactId }).then(res => setFollowUps(res.data));
@@ -75,6 +91,14 @@ export function ContactDetailPage() {
     setEditing(false);
   };
 
+  if (error) return (
+    <div className="py-8 text-center space-y-2">
+      <p className="text-muted-foreground">Contact not found</p>
+      <Button variant="outline" onClick={() => navigate('/contacts')}>
+        <ArrowLeft className="h-4 w-4 mr-1" /> Back to contacts
+      </Button>
+    </div>
+  );
   if (!contact) return <div className="py-8 text-center">Loading...</div>;
 
   return (
@@ -215,27 +239,77 @@ export function ContactDetailPage() {
               ))
             )}
           </div>
-          <InteractionFormDialog open={showInteractionForm} onOpenChange={setShowInteractionForm} contactId={id!} onSaved={() => getInteractions({ contact_id: id! }).then(res => setInteractions(res.data))} />
+          <InteractionFormDialog
+            open={showInteractionForm}
+            onOpenChange={setShowInteractionForm}
+            contactId={id!}
+            onSaved={() => {
+              getInteractions({ contact_id: id! }).then(res => setInteractions(res.data));
+              loadNotifications(id!);
+            }}
+          />
         </TabsContent>
 
         <TabsContent value="deals">
-          {deals.length === 0 ? (
-            <p className="text-muted-foreground text-center py-4">No deals</p>
-          ) : (
-            <div className="space-y-2">
-              {deals.map(d => (
-                <Card key={d.id} className="cursor-pointer" onClick={() => navigate(`/deals`)}>
-                  <CardContent className="pt-4 flex justify-between items-center">
-                    <div>
-                      <p className="font-medium">{d.title}</p>
-                      <p className="text-sm text-muted-foreground">${Number(d.value || 0).toLocaleString()} {d.currency}</p>
-                    </div>
-                    <Badge>{d.stage}</Badge>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
+          <div className="space-y-4">
+            <Button onClick={() => setShowDealForm(true)}><Plus className="h-4 w-4 mr-1" /> Add Deal</Button>
+
+            {pendingNotifications.map(n => (
+              <Card key={n.id} className="border-amber-200 bg-amber-50">
+                <CardContent className="pt-4 flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-amber-800">Create a deal for this?</p>
+                    <p className="text-sm text-amber-700">{n.title}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={() => {
+                      setActiveSuggestion(n);
+                      setShowDealForm(true);
+                    }}>Yes</Button>
+                    <Button size="sm" variant="outline" onClick={async () => {
+                      await resolveNotification(n.id, 'dismissed');
+                      loadNotifications(id!);
+                    }}>No</Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+
+            {deals.length === 0 && pendingNotifications.length === 0 ? (
+              <p className="text-muted-foreground text-center py-4">No deals</p>
+            ) : (
+              <div className="space-y-2">
+                {deals.map(d => (
+                  <Card key={d.id} className="cursor-pointer" onClick={() => navigate(`/pipeline`)}>
+                    <CardContent className="pt-4 flex justify-between items-center">
+                      <div>
+                        <p className="font-medium">{d.title}</p>
+                        <p className="text-sm text-muted-foreground">{formatCurrency(d.value, d.currency)}</p>
+                      </div>
+                      <Badge>{d.stage}</Badge>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <DealQuickFormDialog
+            open={showDealForm}
+            onOpenChange={(v) => { setShowDealForm(v); if (!v) setActiveSuggestion(null); }}
+            contactId={id!}
+            companyId={contact?.company_id || ''}
+            defaultTitle={activeSuggestion?.title || ''}
+            defaultNotes={(() => { try { return JSON.parse(activeSuggestion?.payload || '{}').notes || ''; } catch { return ''; } })()}
+            onSaved={async () => {
+              if (activeSuggestion) {
+                await resolveNotification(activeSuggestion.id, 'accepted');
+                setActiveSuggestion(null);
+                loadNotifications(id!);
+              }
+              loadDeals(id!);
+            }}
+          />
         </TabsContent>
 
         <TabsContent value="followups">
@@ -339,7 +413,7 @@ function InteractionFormDialog({ open, onOpenChange, contactId, onSaved }: { ope
               <Select value={form.type} onValueChange={v => setForm(f => ({ ...f, type: v }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {['call', 'email', 'meeting', 'note', 'linkedin_message', 'other'].map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                  {['call', 'email', 'meeting', 'note', 'cv_sent', 'linkedin_message', 'other'].map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -360,6 +434,77 @@ function InteractionFormDialog({ open, onOpenChange, contactId, onSaved }: { ope
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button onClick={handleSubmit} disabled={saving}>Save</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function DealQuickFormDialog({ open, onOpenChange, contactId, companyId, defaultTitle, defaultNotes, onSaved }: { open: boolean; onOpenChange: (v: boolean) => void; contactId: string; companyId: string; defaultTitle: string; defaultNotes: string; onSaved: () => void }) {
+  const [form, setForm] = useState({ title: '', stage: 'lead', value: '', currency: 'GBP', priority: 'medium', notes: '' });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setForm(f => ({ ...f, title: defaultTitle || f.title, notes: defaultNotes || f.notes }));
+    }
+  }, [open, defaultTitle, defaultNotes]);
+
+  const handleSubmit = async () => {
+    setSaving(true);
+    try {
+      await createDeal({ ...form, contact_id: contactId, company_id: companyId });
+      onOpenChange(false);
+      setForm({ title: '', stage: 'lead', value: '', currency: 'GBP', priority: 'medium', notes: '' });
+      onSaved();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Add Deal</DialogTitle></DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-2"><Label>Title *</Label><Input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="e.g. Senior Dev role, Consulting proposal" /></div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Stage</Label>
+              <Select value={form.stage} onValueChange={v => setForm(f => ({ ...f, stage: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {['lead', 'prospect', 'qualified', 'proposal', 'negotiation', 'won', 'lost'].map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Priority</Label>
+              <Select value={form.priority} onValueChange={v => setForm(f => ({ ...f, priority: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {['low', 'medium', 'high'].map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2"><Label>Value</Label><Input type="number" value={form.value} onChange={e => setForm(f => ({ ...f, value: e.target.value }))} placeholder="0" /></div>
+            <div className="space-y-2">
+              <Label>Currency</Label>
+              <Select value={form.currency} onValueChange={v => setForm(f => ({ ...f, currency: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {['GBP', 'USD', 'EUR'].map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="space-y-2"><Label>Notes</Label><Textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} /></div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={handleSubmit} disabled={saving || !form.title}>Save</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

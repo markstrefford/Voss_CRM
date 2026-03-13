@@ -10,6 +10,7 @@ from app.services.sheet_service import (
     deals_sheet,
     follow_ups_sheet,
     interactions_sheet,
+    notifications_sheet,
 )
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
@@ -80,19 +81,18 @@ def _days_ago_label(date_str: str, now: datetime) -> str:
     if not date_str:
         return ""
     try:
-        dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
-        delta = (now - dt).days
+        # Compare dates only (not datetimes) to avoid "today" for yesterday's events
+        event_date = datetime.fromisoformat(date_str.replace("Z", "+00:00")).date()
     except (ValueError, TypeError):
-        # Fallback: try date-only format
         try:
-            dt = datetime.strptime(date_str[:10], "%Y-%m-%d").replace(tzinfo=timezone.utc)
-            delta = (now - dt).days
+            event_date = datetime.strptime(date_str[:10], "%Y-%m-%d").date()
         except (ValueError, TypeError):
             return ""
+    delta = (now.date() - event_date).days
     if delta <= 0:
         return "today"
     if delta == 1:
-        return "1d ago"
+        return "yesterday"
     return f"{delta}d ago"
 
 
@@ -304,9 +304,26 @@ async def action_feed(_user: dict = Depends(get_current_user)):
         "new_contacts_total": len(new_contacts),
     }
 
+    # --- Notifications: pending deal suggestions, etc. ---
+    pending_notifications = notifications_sheet.get_all({"status": "pending"})
+    notification_items = []
+    for n in pending_notifications:
+        c = contact_map.get(n.get("contact_id", ""), {})
+        notification_items.append({
+            **n,
+            "contact_name": contact_display_name(c),
+            "company_name": company_name_for(c),
+        })
+
+    notifications = {
+        "items": notification_items[:15],
+        "total": len(pending_notifications),
+    }
+
     return {
         "stats": stats,
         "action_required": action_required,
+        "notifications": notifications,
         "momentum": momentum,
         "at_risk": at_risk,
         "ready_to_reach_out": ready_to_reach_out,

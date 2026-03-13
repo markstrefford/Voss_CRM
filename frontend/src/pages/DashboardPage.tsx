@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { getActionFeed } from '@/api';
-import type { ActionFeed, ActionFeedFollowUpItem, ActionFeedContactItem, ActionFeedDealItem } from '@/types';
+import { getActionFeed, completeFollowUp, resolveNotification } from '@/api';
+import type { ActionFeed, ActionFeedFollowUpItem, ActionFeedContactItem, ActionFeedDealItem, NotificationItem } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { formatCurrency } from '@/constants';
 import {
   AlertCircle,
   TrendingUp,
@@ -13,6 +15,8 @@ import {
   MessageCircle,
   Clock,
   DollarSign,
+  Check,
+  Lightbulb,
 } from 'lucide-react';
 
 // --- Local components ---
@@ -28,7 +32,7 @@ function QueueCard({
 }: {
   title: string;
   icon: React.ElementType;
-  color: 'red' | 'green' | 'amber' | 'blue';
+  color: 'red' | 'green' | 'amber' | 'blue' | 'purple';
   count: number;
   viewAllLink: string;
   viewAllLabel: string;
@@ -39,12 +43,14 @@ function QueueCard({
     green: 'text-green-600 bg-green-50 border-green-200',
     amber: 'text-amber-600 bg-amber-50 border-amber-200',
     blue: 'text-blue-600 bg-blue-50 border-blue-200',
+    purple: 'text-purple-600 bg-purple-50 border-purple-200',
   };
   const badgeColorMap = {
     red: 'bg-red-100 text-red-700',
     green: 'bg-green-100 text-green-700',
     amber: 'bg-amber-100 text-amber-700',
     blue: 'bg-blue-100 text-blue-700',
+    purple: 'bg-purple-100 text-purple-700',
   };
 
   return (
@@ -73,21 +79,42 @@ function QueueCard({
   );
 }
 
-function FollowUpRow({ item }: { item: ActionFeedFollowUpItem }) {
-  return (
-    <Link
-      to={`/contacts/${item.contact_id}`}
-      className="flex items-center justify-between p-2 rounded hover:bg-white/60 transition-colors"
-    >
+function FollowUpRow({ item, onComplete }: { item: ActionFeedFollowUpItem; onComplete: (id: string) => void }) {
+  const content = (
+    <>
       <div className="min-w-0">
         <p className="font-medium text-sm truncate">{item.title}</p>
         <p className="text-xs text-muted-foreground truncate">
           {item.contact_name}{item.company_name ? ` - ${item.company_name}` : ''}
         </p>
       </div>
-      <span className="text-xs text-muted-foreground whitespace-nowrap ml-2">
-        {item.due_date}{item.due_time ? ` ${item.due_time}` : ''}
-      </span>
+      <div className="flex items-center gap-1 ml-2 shrink-0">
+        <span className="text-xs text-muted-foreground whitespace-nowrap">
+          {item.due_date}{item.due_time ? ` ${item.due_time}` : ''}
+        </span>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-6 w-6"
+          title="Mark complete"
+          onClick={e => { e.preventDefault(); e.stopPropagation(); onComplete(item.id); }}
+        >
+          <Check className="h-3.5 w-3.5 text-green-600" />
+        </Button>
+      </div>
+    </>
+  );
+
+  if (!item.contact_id) {
+    return <div className="flex items-center justify-between p-2 rounded hover:bg-white/60 transition-colors">{content}</div>;
+  }
+
+  return (
+    <Link
+      to={`/contacts/${item.contact_id}`}
+      className="flex items-center justify-between p-2 rounded hover:bg-white/60 transition-colors"
+    >
+      {content}
     </Link>
   );
 }
@@ -135,22 +162,65 @@ function EmptyQueue({ message }: { message: string }) {
   return <p className="text-sm text-muted-foreground py-2">{message}</p>;
 }
 
+function NotificationRow({ item, onResolve }: { item: NotificationItem; onResolve: (id: string, action: string) => void }) {
+  return (
+    <div className="flex items-center justify-between p-2 rounded hover:bg-white/60 transition-colors">
+      <div className="min-w-0">
+        <p className="font-medium text-sm truncate">{item.title}</p>
+        <p className="text-xs text-muted-foreground truncate">
+          {item.contact_name}{item.company_name ? ` - ${item.company_name}` : ''}
+        </p>
+      </div>
+      <div className="flex items-center gap-1 ml-2 shrink-0">
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7 text-xs"
+          onClick={() => onResolve(item.id, 'accepted')}
+        >
+          Accept
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-7 text-xs"
+          onClick={() => onResolve(item.id, 'dismissed')}
+        >
+          Dismiss
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 // --- Main dashboard ---
 
 export function DashboardPage() {
   const [feed, setFeed] = useState<ActionFeed | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const loadFeed = () => {
     getActionFeed()
       .then(res => setFeed(res.data))
       .finally(() => setLoading(false));
-  }, []);
+  };
+
+  useEffect(() => { loadFeed(); }, []);
+
+  const handleComplete = async (id: string) => {
+    await completeFollowUp(id);
+    loadFeed();
+  };
+
+  const handleResolveNotification = async (id: string, action: string) => {
+    await resolveNotification(id, action);
+    loadFeed();
+  };
 
   if (loading) return <div className="flex items-center justify-center h-64">Loading...</div>;
   if (!feed) return <div>Failed to load dashboard</div>;
 
-  const { stats, action_required, momentum, at_risk, ready_to_reach_out } = feed;
+  const { stats, action_required, notifications, momentum, at_risk, ready_to_reach_out } = feed;
 
   return (
     <div className="space-y-6">
@@ -195,7 +265,7 @@ export function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {stats.pipeline_value > 0 ? `$${stats.pipeline_value.toLocaleString()}` : '$0'}
+              {formatCurrency(stats.pipeline_value)}
             </div>
             <p className="text-xs text-muted-foreground">{stats.deals_in_pipeline} deals</p>
           </CardContent>
@@ -218,7 +288,7 @@ export function DashboardPage() {
             </p>
             <div className="space-y-0.5">
               {action_required.overdue_follow_ups.map(f => (
-                <FollowUpRow key={f.id} item={f} />
+                <FollowUpRow key={f.id} item={f} onComplete={handleComplete} />
               ))}
             </div>
           </div>
@@ -230,7 +300,7 @@ export function DashboardPage() {
             </p>
             <div className="space-y-0.5">
               {action_required.due_today.map(f => (
-                <FollowUpRow key={f.id} item={f} />
+                <FollowUpRow key={f.id} item={f} onComplete={handleComplete} />
               ))}
             </div>
           </div>
@@ -239,6 +309,24 @@ export function DashboardPage() {
           <EmptyQueue message="No overdue or due-today follow-ups. You're on top of things!" />
         )}
       </QueueCard>
+
+      {/* Notifications (purple) — deal suggestions, etc. */}
+      {notifications.total > 0 && (
+        <QueueCard
+          title="Notifications"
+          icon={Lightbulb}
+          color="purple"
+          count={notifications.total}
+          viewAllLink="/deals"
+          viewAllLabel="View deals"
+        >
+          <div className="space-y-0.5">
+            {notifications.items.map(n => (
+              <NotificationRow key={n.id} item={n} onResolve={handleResolveNotification} />
+            ))}
+          </div>
+        </QueueCard>
+      )}
 
       {/* Momentum (green) */}
       <QueueCard

@@ -103,6 +103,21 @@ export interface EmailDraft {
   body: string;
 }
 
+export interface NotificationItem {
+  id: string;
+  type: string;
+  status: string;
+  contact_id: string;
+  company_id: string;
+  title: string;
+  body: string;
+  payload: string;
+  created_at: string;
+  resolved_at: string;
+  contact_name?: string;
+  company_name?: string;
+}
+
 // Action Feed (Smart Queues Dashboard)
 export interface ActionFeedFollowUpItem {
   id: string;
@@ -149,6 +164,10 @@ export interface ActionFeed {
     due_today: ActionFeedFollowUpItem[];
     overdue_total: number;
     due_today_total: number;
+  };
+  notifications: {
+    items: NotificationItem[];
+    total: number;
   };
   momentum: {
     inbound_recent: ActionFeedContactItem[];

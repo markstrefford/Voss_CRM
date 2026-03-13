@@ -1,5 +1,5 @@
 import api from './client';
-import type { Contact, Company, Deal, DashboardSummary, ActionFeed, EmailDraft, FollowUp, Interaction } from '@/types';
+import type { Contact, Company, Deal, DashboardSummary, ActionFeed, EmailDraft, FollowUp, Interaction, NotificationItem } from '@/types';
 
 // Auth
 export const login = (username: string, password: string) =>
@@ -73,6 +73,9 @@ export const getFollowUps = (params?: Record<string, string>) =>
 export const createFollowUp = (data: Partial<FollowUp>) =>
   api.post<FollowUp>('/api/follow-ups', data);
 
+export const updateFollowUp = (id: string, data: Partial<FollowUp>) =>
+  api.put<FollowUp>(`/api/follow-ups/${id}`, data);
+
 export const completeFollowUp = (id: string) =>
   api.patch<FollowUp>(`/api/follow-ups/${id}/complete`);
 
@@ -88,6 +91,13 @@ export const getStalDeals = () =>
 
 export const getActionFeed = () =>
   api.get<ActionFeed>('/api/dashboard/action-feed');
+
+// Notifications
+export const getNotifications = (params?: Record<string, string>) =>
+  api.get<NotificationItem[]>('/api/notifications', { params });
+
+export const resolveNotification = (id: string, action: string) =>
+  api.put(`/api/notifications/${id}/resolve`, { action });
 
 // Email
 export const generateEmailDraft = (data: { contact_id: string; deal_id?: string; intent: string; tone: string }) =>

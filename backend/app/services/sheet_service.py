@@ -207,6 +207,12 @@ SCHEDULER_LOG_COLUMNS = [
     "id", "job_name", "last_run_date", "created_at",
 ]
 
+NOTIFICATIONS_COLUMNS = [
+    "id", "type", "status", "contact_id", "company_id",
+    "title", "body", "payload",
+    "created_at", "resolved_at",
+]
+
 # Lookup used by sheets.py to auto-create tabs with correct headers
 _COLUMNS_BY_TAB = {
     "Contacts": CONTACTS_COLUMNS,
@@ -216,6 +222,7 @@ _COLUMNS_BY_TAB = {
     "FollowUps": FOLLOW_UPS_COLUMNS,
     "Users": USERS_COLUMNS,
     "SchedulerLog": SCHEDULER_LOG_COLUMNS,
+    "Notifications": NOTIFICATIONS_COLUMNS,
 }
 
 # Pre-built service instances
@@ -226,3 +233,4 @@ interactions_sheet = SheetService("Interactions", INTERACTIONS_COLUMNS)
 follow_ups_sheet = SheetService("FollowUps", FOLLOW_UPS_COLUMNS)
 users_sheet = SheetService("Users", USERS_COLUMNS)
 scheduler_log_sheet = SheetService("SchedulerLog", SCHEDULER_LOG_COLUMNS)
+notifications_sheet = SheetService("Notifications", NOTIFICATIONS_COLUMNS)
