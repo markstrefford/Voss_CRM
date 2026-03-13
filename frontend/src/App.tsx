@@ -7,7 +7,6 @@ import { ContactsPage } from '@/pages/ContactsPage';
 import { ContactDetailPage } from '@/pages/ContactDetailPage';
 import { CompaniesPage } from '@/pages/CompaniesPage';
 import { CompanyDetailPage } from '@/pages/CompanyDetailPage';
-import { DealsPage } from '@/pages/DealsPage';
 import { PipelinePage } from '@/pages/PipelinePage';
 import { FollowUpsPage } from '@/pages/FollowUpsPage';
 import type { ReactNode } from 'react';
@@ -32,7 +31,7 @@ function AppRoutes() {
       <Route path="/contacts/:id" element={<ProtectedRoute><ContactDetailPage /></ProtectedRoute>} />
       <Route path="/companies" element={<ProtectedRoute><CompaniesPage /></ProtectedRoute>} />
       <Route path="/companies/:id" element={<ProtectedRoute><CompanyDetailPage /></ProtectedRoute>} />
-      <Route path="/deals" element={<ProtectedRoute><DealsPage /></ProtectedRoute>} />
+      <Route path="/deals" element={<Navigate to="/pipeline" replace />} />
       <Route path="/pipeline" element={<ProtectedRoute><PipelinePage /></ProtectedRoute>} />
       <Route path="/follow-ups" element={<ProtectedRoute><FollowUpsPage /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />

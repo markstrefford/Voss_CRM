@@ -11,6 +11,14 @@ class FollowUpCreate(BaseModel):
     notes: str = ""
 
 
+class FollowUpUpdate(BaseModel):
+    title: str | None = None
+    due_date: str | None = None
+    due_time: str | None = None
+    notes: str | None = None
+    contact_id: str | None = None
+
+
 class FollowUpSnooze(BaseModel):
     due_date: str = Field(..., min_length=1)
     due_time: str = ""

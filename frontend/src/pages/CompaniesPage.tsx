@@ -8,12 +8,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Globe, Building2 } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Plus, Globe, Building2, ArrowUpDown } from 'lucide-react';
 
 export function CompaniesPage() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [sort, setSort] = useState<'recent' | 'az'>('recent');
   const navigate = useNavigate();
 
   const load = () => {
@@ -26,7 +28,16 @@ export function CompaniesPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Companies</h1>
-        <Button onClick={() => setShowForm(true)}><Plus className="h-4 w-4 mr-1" /> Add</Button>
+        <div className="flex items-center gap-2">
+          <Select value={sort} onValueChange={v => setSort(v as 'recent' | 'az')}>
+            <SelectTrigger className="w-[150px]"><ArrowUpDown className="h-3 w-3 mr-1" /><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="recent">Most Recent</SelectItem>
+              <SelectItem value="az">A-Z</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button onClick={() => setShowForm(true)}><Plus className="h-4 w-4 mr-1" /> Add</Button>
+        </div>
       </div>
 
       {loading ? (
@@ -35,7 +46,10 @@ export function CompaniesPage() {
         <div className="text-center py-8 text-muted-foreground">No companies yet</div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {companies.map(c => (
+          {[...companies].sort((a, b) => sort === 'az'
+            ? (a.name || '').localeCompare(b.name || '')
+            : (b.created_at || '').localeCompare(a.created_at || '')
+          ).map(c => (
             <Card key={c.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate(`/companies/${c.id}`)}>
               <CardContent className="pt-4">
                 <div className="flex items-center gap-2">

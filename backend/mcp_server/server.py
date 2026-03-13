@@ -6,7 +6,7 @@ from mcp.server.fastmcp import FastMCP
 
 from mcp_server.tools.contacts import search_contacts, get_contact_details, create_contact
 from mcp_server.tools.interactions import log_interaction, get_interaction_history
-from mcp_server.tools.deals import get_pipeline, get_deal, update_deal_stage
+from mcp_server.tools.deals import get_pipeline, get_deal, update_deal_stage, create_deal, update_deal, promote_contact_to_deal
 from mcp_server.tools.follow_ups import get_follow_ups, create_follow_up, complete_follow_up
 from mcp_server.tools.dashboard import get_dashboard_summary
 
@@ -97,6 +97,62 @@ async def tool_get_deal(deal_id: str) -> str:
 async def tool_update_deal_stage(deal_id: str, stage: str) -> str:
     """Move a deal to a new pipeline stage. Valid stages: lead, prospect, qualified, proposal, negotiation, won, lost."""
     return await asyncio.to_thread(update_deal_stage, deal_id, stage)
+
+
+@mcp.tool()
+async def tool_create_deal(
+    title: str,
+    contact_name: str = "",
+    company_name: str = "",
+    stage: str = "lead",
+    value: str = "",
+    currency: str = "GBP",
+    priority: str = "medium",
+    expected_close: str = "",
+    notes: str = "",
+) -> str:
+    """Create a new deal. Accepts contact/company names (resolved automatically)."""
+    return await asyncio.to_thread(
+        create_deal, title, contact_name, company_name, stage,
+        value, currency, priority, expected_close, notes,
+    )
+
+
+@mcp.tool()
+async def tool_promote_contact_to_deal(
+    contact_name: str,
+    title: str,
+    stage: str = "lead",
+    value: str = "",
+    currency: str = "GBP",
+    priority: str = "medium",
+    notes: str = "",
+) -> str:
+    """Create a deal from a contact, automatically resolving their company. Handy after logging a deal-worthy interaction."""
+    return await asyncio.to_thread(
+        promote_contact_to_deal, contact_name, title, stage,
+        value, currency, priority, notes,
+    )
+
+
+@mcp.tool()
+async def tool_update_deal(
+    deal_id: str,
+    title: str = "",
+    contact_name: str = "",
+    company_name: str = "",
+    stage: str = "",
+    value: str = "",
+    currency: str = "",
+    priority: str = "",
+    expected_close: str = "",
+    notes: str = "",
+) -> str:
+    """Update an existing deal. Only provided fields are changed. Accepts contact/company names."""
+    return await asyncio.to_thread(
+        update_deal, deal_id, title, contact_name, company_name, stage,
+        value, currency, priority, expected_close, notes,
+    )
 
 
 # --- Follow-ups ---

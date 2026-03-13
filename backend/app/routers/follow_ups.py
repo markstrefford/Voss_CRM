@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.dependencies import get_current_user
-from app.models import FollowUp, FollowUpCreate, FollowUpSnooze
+from app.models import FollowUp, FollowUpCreate, FollowUpUpdate, FollowUpSnooze
 from app.services.sheet_service import follow_ups_sheet
 
 router = APIRouter(prefix="/api/follow-ups", tags=["follow-ups"])
@@ -39,6 +39,21 @@ async def create_follow_up(
     _user: dict = Depends(get_current_user),
 ):
     return follow_ups_sheet.create(body.model_dump())
+
+
+@router.put("/{follow_up_id}", response_model=FollowUp)
+async def update_follow_up(
+    follow_up_id: str,
+    body: FollowUpUpdate,
+    _user: dict = Depends(get_current_user),
+):
+    updates = {k: v for k, v in body.model_dump().items() if v is not None}
+    if not updates:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No fields to update")
+    record = follow_ups_sheet.update(follow_up_id, updates)
+    if not record:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Follow-up not found")
+    return record
 
 
 @router.patch("/{follow_up_id}/complete", response_model=FollowUp)

@@ -4,7 +4,7 @@ import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import {
-  LayoutDashboard, Users, Building2, Handshake, KanbanSquare,
+  LayoutDashboard, Users, Building2, KanbanSquare,
   Clock, LogOut, Menu,
 } from 'lucide-react';
 
@@ -12,7 +12,6 @@ const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/contacts', label: 'Contacts', icon: Users },
   { to: '/companies', label: 'Companies', icon: Building2 },
-  { to: '/deals', label: 'Deals', icon: Handshake },
   { to: '/pipeline', label: 'Pipeline', icon: KanbanSquare },
   { to: '/follow-ups', label: 'Follow-ups', icon: Clock },
 ];

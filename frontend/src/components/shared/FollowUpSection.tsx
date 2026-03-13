@@ -2,7 +2,7 @@ import type { FollowUp } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Check, Clock, CalendarPlus } from 'lucide-react';
+import { Check, Clock, CalendarPlus, Pencil } from 'lucide-react';
 
 interface FollowUpSectionProps {
   title: string;
@@ -10,10 +10,11 @@ interface FollowUpSectionProps {
   variant: 'default' | 'destructive' | 'secondary' | 'outline';
   onComplete: (id: string) => void;
   onSnooze: (id: string) => void;
+  onEdit?: (followUp: FollowUp) => void;
   hideActions?: boolean;
 }
 
-export function FollowUpSection({ title, items, variant, onComplete, onSnooze, hideActions }: FollowUpSectionProps) {
+export function FollowUpSection({ title, items, variant, onComplete, onSnooze, onEdit, hideActions }: FollowUpSectionProps) {
   if (items.length === 0) return null;
 
   return (
@@ -41,6 +42,11 @@ export function FollowUpSection({ title, items, variant, onComplete, onSnooze, h
                   <Button variant="ghost" size="icon" title="Snooze" onClick={() => onSnooze(f.id)}>
                     <CalendarPlus className="h-4 w-4" />
                   </Button>
+                  {onEdit && (
+                    <Button variant="ghost" size="icon" title="Edit" onClick={() => onEdit(f)}>
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
               )}
             </CardContent>

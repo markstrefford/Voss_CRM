@@ -1,37 +1,48 @@
 import { useEffect, useState } from 'react';
-import { getDeals, createDeal } from '@/api';
-import type { Deal, DealStage } from '@/types';
+import { getDeals, getContacts, getCompanies } from '@/api';
+import type { Deal, Contact, Company } from '@/types';
 import { DEAL_STAGES } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, DollarSign } from 'lucide-react';
+import { Plus } from 'lucide-react';
+import { formatCurrency } from '@/constants';
+import { DealFormDialog } from '@/components/shared/DealFormDialog';
 
-const stageBadgeColors: Record<string, string> = {
-  lead: 'bg-gray-100 text-gray-800',
-  prospect: 'bg-blue-100 text-blue-800',
-  qualified: 'bg-indigo-100 text-indigo-800',
-  proposal: 'bg-purple-100 text-purple-800',
-  negotiation: 'bg-orange-100 text-orange-800',
-  won: 'bg-green-100 text-green-800',
-  lost: 'bg-red-100 text-red-800',
+const stageColumnColors: Record<string, string> = {
+  lead: 'border-t-gray-400',
+  prospect: 'border-t-blue-400',
+  qualified: 'border-t-indigo-400',
+  proposal: 'border-t-purple-400',
+  negotiation: 'border-t-orange-400',
+  won: 'border-t-green-400',
+  lost: 'border-t-red-400',
 };
 
 export function DealsPage() {
   const [deals, setDeals] = useState<Deal[]>([]);
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [editDeal, setEditDeal] = useState<Deal | null>(null);
 
   const load = () => {
-    getDeals().then(res => setDeals(res.data)).finally(() => setLoading(false));
+    Promise.all([getDeals(), getContacts(), getCompanies()])
+      .then(([d, c, co]) => {
+        setDeals(d.data);
+        setContacts(c.data);
+        setCompanies(co.data);
+      })
+      .finally(() => setLoading(false));
   };
 
   useEffect(() => { load(); }, []);
+
+  const contactMap = Object.fromEntries(contacts.map(c => [c.id, `${c.first_name} ${c.last_name}`.trim()]));
+  const companyMap = Object.fromEntries(companies.map(c => [c.id, c.name]));
+
+  const dealsByStage = (stage: string) => deals.filter(d => d.stage === stage);
 
   return (
     <div className="space-y-4">
@@ -45,86 +56,85 @@ export function DealsPage() {
       ) : deals.length === 0 ? (
         <div className="text-center py-8 text-muted-foreground">No deals yet</div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {deals.map(d => (
-            <Card key={d.id}>
-              <CardContent className="pt-4">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <p className="font-semibold">{d.title}</p>
-                    <div className="flex items-center gap-1 mt-1 text-lg">
-                      <DollarSign className="h-4 w-4" />
-                      {Number(d.value || 0).toLocaleString()} {d.currency}
+        <>
+          {/* Desktop: horizontal columns */}
+          <div className="hidden md:flex gap-3 overflow-x-auto pb-4">
+            {DEAL_STAGES.map(stage => {
+              const stageDeals = dealsByStage(stage);
+              const stageTotal = stageDeals.reduce((sum, d) => sum + Number(d.value || 0), 0);
+              return (
+                <div key={stage} className="flex-shrink-0 w-56">
+                  <div className={`border-t-4 ${stageColumnColors[stage] || 'border-t-gray-400'} rounded-t bg-muted/50 px-3 py-2`}>
+                    <div className="flex justify-between items-center">
+                      <span className="font-medium text-sm capitalize">{stage}</span>
+                      <Badge variant="secondary" className="text-xs">{stageDeals.length}</Badge>
                     </div>
+                    {stageTotal > 0 && (
+                      <p className="text-xs text-muted-foreground mt-0.5">{formatCurrency(stageTotal)}</p>
+                    )}
                   </div>
-                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${stageBadgeColors[d.stage] || ''}`}>
-                    {d.stage}
-                  </span>
+                  <div className="min-h-[120px] space-y-2 p-2 bg-muted/20 rounded-b">
+                    {stageDeals.map(d => (
+                      <Card key={d.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setEditDeal(d)}>
+                        <CardContent className="p-3">
+                          <p className="font-medium text-sm">{d.title}</p>
+                          {(contactMap[d.contact_id] || companyMap[d.company_id]) && (
+                            <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                              {[contactMap[d.contact_id], companyMap[d.company_id]].filter(Boolean).join(' - ')}
+                            </p>
+                          )}
+                          <p className="text-sm text-muted-foreground mt-1">{formatCurrency(d.value, d.currency)}</p>
+                          <div className="flex items-center gap-2 mt-2">
+                            <Badge variant={d.priority === 'high' ? 'destructive' : 'secondary'} className="text-xs">{d.priority}</Badge>
+                            {d.expected_close && <span className="text-xs text-muted-foreground">Close: {d.expected_close}</span>}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 mt-3">
-                  <Badge variant={d.priority === 'high' ? 'destructive' : 'secondary'}>{d.priority}</Badge>
-                  {d.expected_close && <span className="text-xs text-muted-foreground">Close: {d.expected_close}</span>}
+              );
+            })}
+          </div>
+
+          {/* Mobile: stacked sections */}
+          <div className="md:hidden space-y-4">
+            {DEAL_STAGES.map(stage => {
+              const stageDeals = dealsByStage(stage);
+              if (stageDeals.length === 0) return null;
+              return (
+                <div key={stage} className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <h2 className="font-semibold text-sm capitalize">{stage}</h2>
+                    <Badge variant="secondary" className="text-xs">{stageDeals.length}</Badge>
+                  </div>
+                  {stageDeals.map(d => (
+                    <Card key={d.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setEditDeal(d)}>
+                      <CardContent className="p-3 flex justify-between items-center">
+                        <div>
+                          <p className="font-medium text-sm">{d.title}</p>
+                          {(contactMap[d.contact_id] || companyMap[d.company_id]) && (
+                            <p className="text-xs text-muted-foreground truncate">
+                              {[contactMap[d.contact_id], companyMap[d.company_id]].filter(Boolean).join(' - ')}
+                            </p>
+                          )}
+                          <p className="text-sm text-muted-foreground">{formatCurrency(d.value, d.currency)}</p>
+                        </div>
+                        <Badge variant={d.priority === 'high' ? 'destructive' : 'secondary'} className="text-xs">{d.priority}</Badge>
+                      </CardContent>
+                    </Card>
+                  ))}
                 </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+              );
+            })}
+          </div>
+        </>
       )}
 
-      <DealFormDialog open={showForm} onOpenChange={setShowForm} onSaved={load} />
+      <DealFormDialog open={showForm} onOpenChange={setShowForm} onSaved={load} contacts={contacts} companies={companies} />
+      {editDeal && (
+        <DealFormDialog open={true} onOpenChange={() => setEditDeal(null)} onSaved={load} deal={editDeal} contacts={contacts} companies={companies} />
+      )}
     </div>
-  );
-}
-
-function DealFormDialog({ open, onOpenChange, onSaved }: { open: boolean; onOpenChange: (v: boolean) => void; onSaved: () => void }) {
-  const [form, setForm] = useState<{ title: string; value: string; currency: string; stage: DealStage; priority: string; expected_close: string; notes: string }>({ title: '', value: '', currency: 'USD', stage: 'lead', priority: 'medium', expected_close: '', notes: '' });
-  const [saving, setSaving] = useState(false);
-
-  const handleSubmit = async () => {
-    setSaving(true);
-    try {
-      await createDeal(form);
-      onOpenChange(false);
-      setForm({ title: '', value: '', currency: 'USD', stage: 'lead', priority: 'medium', expected_close: '', notes: '' });
-      onSaved();
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader><DialogTitle>New Deal</DialogTitle></DialogHeader>
-        <div className="space-y-4">
-          <div className="space-y-2"><Label>Title *</Label><Input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} /></div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2"><Label>Value</Label><Input type="number" value={form.value} onChange={e => setForm(f => ({ ...f, value: e.target.value }))} /></div>
-            <div className="space-y-2">
-              <Label>Stage</Label>
-              <Select value={form.stage} onValueChange={v => setForm(f => ({ ...f, stage: v as DealStage }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{DEAL_STAGES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Priority</Label>
-              <Select value={form.priority} onValueChange={v => setForm(f => ({ ...f, priority: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{['low', 'medium', 'high'].map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2"><Label>Expected Close</Label><Input type="date" value={form.expected_close} onChange={e => setForm(f => ({ ...f, expected_close: e.target.value }))} /></div>
-          </div>
-          <div className="space-y-2"><Label>Notes</Label><Textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} /></div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={handleSubmit} disabled={saving || !form.title}>Save</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   );
 }

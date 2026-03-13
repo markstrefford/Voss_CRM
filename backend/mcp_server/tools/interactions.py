@@ -2,6 +2,7 @@
 
 from datetime import datetime, timezone
 
+from app.routers.interactions import check_deal_suggestion
 from app.services.sheet_service import interactions_sheet
 from mcp_server.helpers import resolve_contact_name
 
@@ -35,9 +36,13 @@ def log_interaction(
     }
     record = interactions_sheet.create(data)
     name = resolve_contact_name(contact_id)
-    return (
-        f"Logged {type} with **{name}**: \"{subject}\" (ID: {record['id']})"
-    )
+    result = f"Logged {type} with **{name}**: \"{subject}\" (ID: {record['id']})"
+
+    suggestion = check_deal_suggestion(subject, body, type)
+    if suggestion:
+        result += "\n\n💡 This looks like a deal opportunity — consider using tool_create_deal to track it."
+
+    return result
 
 
 def get_interaction_history(
