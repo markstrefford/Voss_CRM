@@ -44,6 +44,12 @@
       }
     }
 
+    // Fallback: extract name from page title ("First Last | LinkedIn")
+    if (!fullName) {
+      const titleMatch = document.title.match(/^(.+?)\s*[|\u2013\u2014–—]?\s*LinkedIn/i);
+      if (titleMatch) fullName = titleMatch[1].trim();
+    }
+
     const nameParts = fullName.split(' ');
     const firstName = nameParts[0] || '';
     const lastName = nameParts.slice(1).join(' ') || '';
@@ -92,7 +98,66 @@
     };
   }
 
+  function isExtensionContextValid() {
+    try {
+      return !!(chrome.runtime && chrome.runtime.id);
+    } catch {
+      return false;
+    }
+  }
+
+  function showRefreshBanner() {
+    const existing = document.getElementById('crm-refresh-banner');
+    if (existing) return;
+
+    const banner = document.createElement('div');
+    banner.id = 'crm-refresh-banner';
+    Object.assign(banner.style, {
+      position: 'fixed',
+      bottom: '80px',
+      right: '20px',
+      zIndex: '10001',
+      background: '#fff',
+      border: '1px solid #ddd',
+      borderRadius: '10px',
+      boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+      padding: '14px 18px',
+      width: '280px',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      fontSize: '13px',
+      textAlign: 'center',
+    });
+
+    banner.innerHTML = `
+      <div style="margin-bottom:10px;color:#333;font-weight:600;">Extension was updated</div>
+      <div style="margin-bottom:12px;color:#666;">Please refresh the page to reconnect.</div>
+    `;
+
+    const refreshBtn = document.createElement('button');
+    refreshBtn.textContent = 'Refresh page';
+    Object.assign(refreshBtn.style, {
+      padding: '7px 20px',
+      border: 'none',
+      borderRadius: '6px',
+      background: '#0a66c2',
+      color: '#fff',
+      cursor: 'pointer',
+      fontWeight: '600',
+      fontSize: '13px',
+    });
+    refreshBtn.addEventListener('click', () => window.location.reload());
+    banner.appendChild(refreshBtn);
+
+    document.body.appendChild(banner);
+  }
+
   function showContextPanel() {
+    // If extension context is dead, prompt refresh instead
+    if (!isExtensionContextValid()) {
+      showRefreshBanner();
+      return;
+    }
+
     // If panel already open, focus it
     const existing = document.getElementById('crm-context-panel');
     if (existing) {
@@ -187,8 +252,10 @@
     saveBtn.disabled = true;
 
     try {
-      if (!chrome.runtime?.sendMessage) {
-        throw new Error('Extension reloaded — please refresh the page');
+      if (!isExtensionContextValid()) {
+        panel.remove();
+        showRefreshBanner();
+        return;
       }
 
       const auth = await chrome.runtime.sendMessage({ type: 'GET_AUTH' });
@@ -218,9 +285,11 @@
       panel.remove();
       setTimeout(() => { btn.textContent = 'Add to Voss'; btn.style.background = ''; btn.disabled = false; }, 3000);
     } catch (err) {
-      saveBtn.textContent = 'Error';
+      const msg = err.message || 'Unknown error';
+      saveBtn.textContent = msg.length > 30 ? msg.slice(0, 28) + '…' : msg;
       saveBtn.style.background = '#c62828';
-      setTimeout(() => { saveBtn.textContent = 'Save to Voss'; saveBtn.style.background = '#0a66c2'; saveBtn.disabled = false; }, 3000);
+      saveBtn.style.minWidth = 'fit-content';
+      setTimeout(() => { saveBtn.textContent = 'Save to Voss'; saveBtn.style.background = '#0a66c2'; saveBtn.style.minWidth = ''; saveBtn.disabled = false; }, 4000);
     }
   }
 

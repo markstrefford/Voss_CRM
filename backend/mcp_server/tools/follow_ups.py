@@ -1,10 +1,6 @@
-"""Follow-up tools for the MCP server."""
+"""Follow-up tools — calls VOSS API over HTTP."""
 
-from datetime import datetime, timezone
-
-from app.helpers import group_follow_ups, today_str
-from app.services.sheet_service import follow_ups_sheet
-from mcp_server.helpers import resolve_contact_name
+from mcp_server.api_client import api_get, api_post, api_put
 
 
 def get_follow_ups(
@@ -12,71 +8,33 @@ def get_follow_ups(
     overdue_only: bool = False,
     contact_id: str = "",
 ) -> str:
-    """Get follow-ups, optionally filtered by status, overdue, or contact.
-
-    Args:
-        status: Filter by status — 'pending', 'completed', or 'all' (default: pending)
-        overdue_only: If true, only return overdue follow-ups
-        contact_id: Filter by contact ID
-    """
-    fups = follow_ups_sheet.get_all()
-    today = today_str()
-
-    if status and status != "all":
-        fups = [f for f in fups if f.get("status") == status]
+    params = {"status": status}
     if contact_id:
-        fups = [f for f in fups if f.get("contact_id") == contact_id]
-    if overdue_only:
-        fups = [
-            f for f in fups
-            if f.get("status") == "pending" and f.get("due_date", "") < today
-        ]
+        params["contact_id"] = contact_id
 
-    # Sort by due date
-    fups.sort(key=lambda f: f.get("due_date", "9999"))
-
+    fups = api_get("/api/follow-ups", params)
     if not fups:
-        label = "overdue follow-ups" if overdue_only else f"{status} follow-ups"
-        return f"No {label} found."
+        return "No follow-ups found."
 
-    groups = group_follow_ups(fups, today)
-    overdue = groups["overdue"]
-    todays = groups["today"]
-    rest = groups["upcoming"] + groups["completed"]
+    if overdue_only:
+        from datetime import date
+        today = date.today().isoformat()
+        fups = [f for f in fups if f.get("due_date", "") < today]
+        if not fups:
+            return "No overdue follow-ups."
 
-    lines = ["# Follow-ups\n"]
-
-    if overdue:
-        lines.append(f"## Overdue ({len(overdue)})")
-        for f in overdue:
-            _append_follow_up(lines, f)
-        lines.append("")
-
-    if todays:
-        lines.append(f"## Today ({len(todays)})")
-        for f in todays:
-            _append_follow_up(lines, f)
-        lines.append("")
-
-    if rest:
-        label = "Upcoming" if status == "pending" else "Other"
-        lines.append(f"## {label} ({len(rest)})")
-        for f in rest:
-            _append_follow_up(lines, f)
-        lines.append("")
-
+    lines = [f"Found {len(fups)} follow-up(s):\n"]
+    for f in fups:
+        due = f.get("due_date", "no date")
+        if f.get("due_time"):
+            due += f" {f['due_time']}"
+        contact = f.get("contact_name", "")
+        line = f"- {f.get('title', 'Untitled')} — due {due}"
+        if contact:
+            line += f" ({contact})"
+        line += f" [ID: {f['id']}]"
+        lines.append(line)
     return "\n".join(lines)
-
-
-def _append_follow_up(lines: list[str], f: dict) -> None:
-    contact = resolve_contact_name(f.get("contact_id", ""))
-    due = f.get("due_date", "no date")
-    if f.get("due_time"):
-        due += f" {f['due_time']}"
-    lines.append(f"- **{f.get('title', 'Untitled')}** — {contact}")
-    lines.append(f"  Due: {due} | ID: {f['id']}")
-    if f.get("notes"):
-        lines.append(f"  Notes: {f['notes']}")
 
 
 def create_follow_up(
@@ -87,53 +45,22 @@ def create_follow_up(
     deal_id: str = "",
     notes: str = "",
 ) -> str:
-    """Schedule a new follow-up for a contact.
-
-    Args:
-        contact_id: The contact's ID
-        title: What to follow up about
-        due_date: Due date in YYYY-MM-DD format
-        due_time: Optional due time in HH:MM format
-        deal_id: Associated deal ID (if applicable)
-        notes: Additional notes
-    """
     data = {
         "contact_id": contact_id,
         "title": title,
         "due_date": due_date,
-        "due_time": due_time,
-        "deal_id": deal_id,
-        "notes": notes,
-        "status": "pending",
     }
-    record = follow_ups_sheet.create(data)
-    name = resolve_contact_name(contact_id)
-    return (
-        f"Created follow-up: **{title}** with {name}, due {due_date}"
-        + (f" at {due_time}" if due_time else "")
-        + f" (ID: {record['id']})"
-    )
+    if due_time:
+        data["due_time"] = due_time
+    if deal_id:
+        data["deal_id"] = deal_id
+    if notes:
+        data["notes"] = notes
+
+    fup = api_post("/api/follow-ups", data)
+    return f"Created follow-up **{title}** due {due_date} (ID: {fup['id']})."
 
 
 def complete_follow_up(follow_up_id: str) -> str:
-    """Mark a follow-up as completed.
-
-    Args:
-        follow_up_id: The follow-up's unique ID
-    """
-    fup = follow_ups_sheet.get_by_id(follow_up_id)
-    if not fup:
-        return f"Follow-up '{follow_up_id}' not found."
-
-    if fup.get("status") == "completed":
-        return f"Follow-up '{fup.get('title', '')}' is already completed."
-
-    updated = follow_ups_sheet.update(follow_up_id, {
-        "status": "completed",
-        "completed_at": datetime.now(timezone.utc).isoformat(),
-    })
-    if not updated:
-        return f"Failed to complete follow-up '{follow_up_id}'."
-
-    name = resolve_contact_name(fup.get("contact_id", ""))
-    return f"Completed follow-up: **{fup.get('title', '')}** with {name}."
+    fup = api_put(f"/api/follow-ups/{follow_up_id}", {"status": "completed"})
+    return f"Follow-up **{fup.get('title', follow_up_id)}** marked as completed."

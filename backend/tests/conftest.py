@@ -13,11 +13,21 @@ def mock_worksheet():
     ws._data = []
     ws._headers = []
 
+    def row_values(row_num):
+        """Return headers for row 1 (used by _sheet_columns)."""
+        if row_num == 1:
+            return ws._headers
+        return []
+
     def get_all_records():
         if not ws._data:
             return []
+        n = len(ws._headers)
         return [
-            {ws._headers[i]: str(row[i]) for i in range(len(ws._headers))}
+            {
+                ws._headers[i]: str(row[i] if i < len(row) else "")
+                for i in range(n)
+            }
             for row in ws._data
         ]
 
@@ -35,6 +45,7 @@ def mock_worksheet():
             if 0 <= row_idx < len(ws._data):
                 ws._data[row_idx] = values[0]
 
+    ws.row_values = row_values
     ws.get_all_records = get_all_records
     ws.append_row = append_row
     ws.delete_rows = delete_rows
@@ -85,14 +96,23 @@ def seeded_contacts_ws(mock_worksheet):
     """Pre-seed contacts worksheet."""
     from app.services.sheet_service import CONTACTS_COLUMNS
     mock_worksheet._headers = CONTACTS_COLUMNS
+    # Columns: id, company_id, first_name, last_name, email, phone,
+    #   role, linkedin_url, platform_handles, urls, source, referral_contact_id,
+    #   tags, notes, status,
+    #   segment, engagement_stage, inbound_channel, do_not_contact, campaign_id,
+    #   created_at, updated_at
     mock_worksheet._data.append([
         "c1", "comp1", "John", "Smith", "john@example.com", "+1234567890",
-        "CTO", "https://linkedin.com/in/jsmith", "", "referral", "",
-        "tech,vip", "Met at conference", "active", "2024-01-01T00:00:00", "2024-01-01T00:00:00",
+        "CTO", "https://linkedin.com/in/jsmith", "", "", "referral", "",
+        "tech,vip", "Met at conference", "active",
+        "", "", "", "", "",
+        "2024-01-01T00:00:00", "2024-01-01T00:00:00",
     ])
     mock_worksheet._data.append([
         "c2", "comp1", "Jane", "Doe", "jane@example.com", "",
-        "CEO", "", "", "linkedin", "",
-        "decision-maker", "", "active", "2024-01-02T00:00:00", "2024-01-02T00:00:00",
+        "CEO", "", "", "", "linkedin", "",
+        "decision-maker", "", "active",
+        "", "", "", "", "",
+        "2024-01-02T00:00:00", "2024-01-02T00:00:00",
     ])
     return mock_worksheet

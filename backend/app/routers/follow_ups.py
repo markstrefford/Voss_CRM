@@ -14,6 +14,8 @@ async def list_follow_ups(
     status_filter: str | None = Query(None, alias="status"),
     contact_id: str | None = Query(None),
     overdue: bool | None = Query(None),
+    limit: int | None = Query(None, ge=1, le=500),
+    offset: int | None = Query(None, ge=0),
     _user: dict = Depends(get_current_user),
 ):
     filters = {}
@@ -21,7 +23,7 @@ async def list_follow_ups(
         filters["status"] = status_filter
     if contact_id:
         filters["contact_id"] = contact_id
-    records = follow_ups_sheet.get_all(filters or None)
+    records = follow_ups_sheet.get_all(filters or None, limit=limit, offset=offset)
 
     if overdue:
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")

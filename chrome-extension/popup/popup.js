@@ -23,9 +23,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   let lookupResults = {};
 
   // Load saved state
-  const { token, apiUrl, username } = await chrome.storage.local.get(['token', 'apiUrl', 'username']);
+  const { token, apiUrl, username, password } = await chrome.storage.local.get(['token', 'apiUrl', 'username', 'password']);
 
   if (apiUrl) apiUrlInput.value = apiUrl;
+  if (username) document.getElementById('username').value = username;
+  if (password) document.getElementById('password').value = password;
 
   if (token) {
     showMainSection(username || 'User');
