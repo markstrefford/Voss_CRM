@@ -18,6 +18,8 @@ async def list_contacts(
     company_id: str | None = Query(None),
     segment: str | None = Query(None),
     engagement_stage: str | None = Query(None),
+    limit: int | None = Query(None, ge=1, le=500),
+    offset: int | None = Query(None, ge=0),
     _user: dict = Depends(get_current_user),
 ):
     if q:
@@ -35,7 +37,7 @@ async def list_contacts(
             filters["segment"] = segment
         if engagement_stage:
             filters["engagement_stage"] = engagement_stage
-        records = contacts_sheet.get_all(filters or None)
+        records = contacts_sheet.get_all(filters or None, limit=limit, offset=offset)
 
     if tag:
         records = [r for r in records if tag.lower() in r.get("tags", "").lower()]

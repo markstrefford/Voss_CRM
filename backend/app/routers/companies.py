@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.dependencies import get_current_user
 from app.models import Company, CompanyCreate, CompanyUpdate
@@ -8,8 +8,12 @@ router = APIRouter(prefix="/api/companies", tags=["companies"])
 
 
 @router.get("", response_model=list[Company])
-async def list_companies(_user: dict = Depends(get_current_user)):
-    return companies_sheet.get_all()
+async def list_companies(
+    limit: int | None = Query(None, ge=1, le=500),
+    offset: int | None = Query(None, ge=0),
+    _user: dict = Depends(get_current_user),
+):
+    return companies_sheet.get_all(limit=limit, offset=offset)
 
 
 @router.post("", response_model=Company, status_code=status.HTTP_201_CREATED)
