@@ -52,6 +52,8 @@ async def update_follow_up(
     updates = {k: v for k, v in body.model_dump().items() if v is not None}
     if not updates:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No fields to update")
+    if updates.get("status") == "completed" and not updates.get("completed_at"):
+        updates["completed_at"] = datetime.now(timezone.utc).isoformat()
     record = follow_ups_sheet.update(follow_up_id, updates)
     if not record:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Follow-up not found")
