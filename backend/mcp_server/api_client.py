@@ -53,11 +53,20 @@ def api_post(path: str, data: dict) -> dict:
 
 def api_put(path: str, data: dict) -> dict:
     """Make a PUT request to the VOSS API."""
+    return _api_write(path, data, "PUT")
+
+
+def api_patch(path: str, data: dict | None = None) -> dict:
+    """Make a PATCH request to the VOSS API."""
+    return _api_write(path, data or {}, "PATCH")
+
+
+def _api_write(path: str, data: dict, method: str) -> dict:
     base_url, api_key = _get_config()
     url = f"{base_url}{path}"
 
     body = json.dumps(data).encode()
-    req = urllib.request.Request(url, data=body, method="PUT")
+    req = urllib.request.Request(url, data=body, method=method)
     req.add_header("Content-Type", "application/json")
     req.add_header("X-API-Key", api_key)
 

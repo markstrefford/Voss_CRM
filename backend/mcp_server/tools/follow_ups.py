@@ -1,6 +1,6 @@
 """Follow-up tools — calls VOSS API over HTTP."""
 
-from mcp_server.api_client import api_get, api_post, api_put
+from mcp_server.api_client import api_get, api_patch, api_post
 
 
 def get_follow_ups(
@@ -62,5 +62,5 @@ def create_follow_up(
 
 
 def complete_follow_up(follow_up_id: str) -> str:
-    fup = api_put(f"/api/follow-ups/{follow_up_id}", {"status": "completed"})
+    fup = api_patch(f"/api/follow-ups/{follow_up_id}/complete")
     return f"Follow-up **{fup.get('title', follow_up_id)}** marked as completed."
