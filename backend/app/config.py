@@ -44,6 +44,21 @@ class Settings(BaseSettings):
         except json.JSONDecodeError:
             return None
 
+    def validate_production(self):
+        """Refuse to start in production with placeholder secrets."""
+        errors = []
+        if self.jwt_secret_key == "change-me-to-a-random-secret":
+            errors.append("JWT_SECRET_KEY is still the default placeholder")
+        if self.invite_code == "change-me":
+            errors.append("INVITE_CODE is still the default placeholder")
+        if not self.voss_api_key:
+            errors.append("VOSS_API_KEY is not set")
+        if errors:
+            raise RuntimeError(
+                "Production startup blocked — fix these secrets:\n  - "
+                + "\n  - ".join(errors)
+            )
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
 

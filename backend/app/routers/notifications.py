@@ -22,6 +22,8 @@ router = APIRouter(prefix="/api/notifications", tags=["notifications"])
 async def list_notifications(
     status_filter: str | None = Query(None, alias="status"),
     contact_id: str | None = Query(None),
+    limit: int | None = Query(None, ge=1, le=500),
+    offset: int | None = Query(None, ge=0),
     _user: dict = Depends(get_current_user),
 ):
     filters = {}
@@ -29,7 +31,7 @@ async def list_notifications(
         filters["status"] = status_filter
     if contact_id:
         filters["contact_id"] = contact_id
-    return notifications_sheet.get_all(filters or None)
+    return notifications_sheet.get_all(filters or None, limit=limit, offset=offset)
 
 
 @router.put("/{notification_id}/resolve", response_model=dict)

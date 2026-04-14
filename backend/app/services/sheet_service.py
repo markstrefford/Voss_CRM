@@ -48,12 +48,21 @@ class SheetService:
     def _new_id(self) -> str:
         return str(uuid.uuid4())[:8]
 
-    def get_all(self, filters: dict | None = None) -> list[dict]:
+    def get_all(
+        self,
+        filters: dict | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> list[dict]:
         records = self._get_all_records()
         if filters:
             for key, value in filters.items():
                 if value is not None and value != "":
                     records = [r for r in records if r.get(key, "") == value]
+        if offset:
+            records = records[offset:]
+        if limit:
+            records = records[:limit]
         return records
 
     def search(self, query: str, search_fields: list[str]) -> list[dict]:
@@ -103,7 +112,7 @@ class SheetService:
         ws = self._worksheet()
         sheet_cols = self._sheet_columns(ws)
         rows = [[record.get(col, "") for col in sheet_cols] for record in records]
-        ws.append_rows(rows, value_input_option="USER_ENTERED")
+        ws.append_rows(rows, value_input_option="RAW")
         self._invalidate_cache()
         return records
 
@@ -121,7 +130,7 @@ class SheetService:
         ws = self._worksheet()
         sheet_cols = self._sheet_columns(ws)
         row = [record.get(col, "") for col in sheet_cols]
-        ws.append_row(row, value_input_option="USER_ENTERED")
+        ws.append_row(row, value_input_option="RAW")
         self._invalidate_cache()
         return record
 

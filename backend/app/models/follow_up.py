@@ -17,6 +17,8 @@ class FollowUpUpdate(BaseModel):
     due_time: str | None = None
     notes: str | None = None
     contact_id: str | None = None
+    status: str | None = None
+    completed_at: str | None = None
 
 
 class FollowUpSnooze(BaseModel):

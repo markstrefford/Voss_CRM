@@ -4,7 +4,7 @@
   "version": "1.1.0",
   "description": "Capture LinkedIn profiles and engagement to Voss CRM",
   "permissions": ["storage", "activeTab"],
-  "host_permissions": ["https://www.linkedin.com/*", "http://localhost/*", "http://127.0.0.1/*"],
+  "host_permissions": ["https://www.linkedin.com/*", "http://localhost:8000/*", "http://127.0.0.1:8000/*"],
   "action": {
     "default_popup": "popup/popup.html",
     "default_icon": {

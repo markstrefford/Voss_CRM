@@ -14,7 +14,7 @@ class TestContactEndpoints:
 
     def test_list_contacts_no_auth(self, client):
         resp = client.get("/api/contacts")
-        assert resp.status_code == 403
+        assert resp.status_code == 401
 
     def test_search_contacts(self, client, auth_headers, seeded_contacts_ws):
         with patch("app.routers.contacts.contacts_sheet._worksheet", return_value=seeded_contacts_ws):

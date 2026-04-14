@@ -89,6 +89,7 @@ async function handleLogin({ apiUrl, username, password }) {
     token: data.access_token,
     apiUrl,
     username,
+    password,
   });
 
   return { success: true, access_token: data.access_token };
@@ -116,7 +117,13 @@ async function handleApiRequest({ method, path, body }) {
   const data = await resp.json();
 
   if (!resp.ok) {
-    throw new Error(data.detail || `HTTP ${resp.status}`);
+    let msg = `HTTP ${resp.status}`;
+    if (Array.isArray(data.detail)) {
+      msg = data.detail.map(e => e.msg || e.message || JSON.stringify(e)).join('; ');
+    } else if (typeof data.detail === 'string') {
+      msg = data.detail;
+    }
+    throw new Error(msg);
   }
 
   return data;

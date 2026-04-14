@@ -144,19 +144,39 @@ async def stale_deal_alerts():
 
 
 async def _catch_up_missed_jobs():
-    """On startup, send any scheduled alerts that were missed today."""
-    now = datetime.now(timezone.utc)
-    hour_min = now.hour * 60 + now.minute
+    """On startup, send any scheduled alerts that were missed today.
 
-    # Morning digest at 09:30 — if it's past that, send now
-    if hour_min >= 9 * 60 + 30:
-        logger.info("Catching up missed morning digest")
-        await morning_digest()
+    Retries up to 3 times with exponential back-off to handle transient
+    Google Sheets API errors (e.g. 503 Service Unavailable).
+    """
+    for attempt in range(1, 4):
+        try:
+            now = datetime.now(timezone.utc)
+            hour_min = now.hour * 60 + now.minute
 
-    # Stale deal alerts at 18:00 — if it's past that, send now
-    if hour_min >= 18 * 60:
-        logger.info("Catching up missed stale deal alerts")
-        await stale_deal_alerts()
+            # Morning digest at 09:30 — if it's past that, send now
+            if hour_min >= 9 * 60 + 30:
+                logger.info("Catching up missed morning digest")
+                await morning_digest()
+
+            # Stale deal alerts at 18:00 — if it's past that, send now
+            if hour_min >= 18 * 60:
+                logger.info("Catching up missed stale deal alerts")
+                await stale_deal_alerts()
+
+            return  # success
+        except Exception:
+            if attempt < 3:
+                delay = 2 ** attempt  # 2s, 4s
+                logger.warning(
+                    "Catch-up attempt %d/3 failed, retrying in %ds…",
+                    attempt, delay, exc_info=True,
+                )
+                await asyncio.sleep(delay)
+            else:
+                logger.error(
+                    "Catch-up failed after 3 attempts — skipping", exc_info=True
+                )
 
 
 def start_scheduler():

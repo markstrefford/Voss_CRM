@@ -14,6 +14,8 @@ async def list_follow_ups(
     status_filter: str | None = Query(None, alias="status"),
     contact_id: str | None = Query(None),
     overdue: bool | None = Query(None),
+    limit: int | None = Query(None, ge=1, le=500),
+    offset: int | None = Query(None, ge=0),
     _user: dict = Depends(get_current_user),
 ):
     filters = {}
@@ -21,7 +23,7 @@ async def list_follow_ups(
         filters["status"] = status_filter
     if contact_id:
         filters["contact_id"] = contact_id
-    records = follow_ups_sheet.get_all(filters or None)
+    records = follow_ups_sheet.get_all(filters or None, limit=limit, offset=offset)
 
     if overdue:
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -50,6 +52,8 @@ async def update_follow_up(
     updates = {k: v for k, v in body.model_dump().items() if v is not None}
     if not updates:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No fields to update")
+    if updates.get("status") == "completed" and not updates.get("completed_at"):
+        updates["completed_at"] = datetime.now(timezone.utc).isoformat()
     record = follow_ups_sheet.update(follow_up_id, updates)
     if not record:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Follow-up not found")

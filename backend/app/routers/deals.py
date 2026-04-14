@@ -12,6 +12,8 @@ async def list_deals(
     stage: str | None = Query(None),
     priority: str | None = Query(None),
     contact_id: str | None = Query(None),
+    limit: int | None = Query(None, ge=1, le=500),
+    offset: int | None = Query(None, ge=0),
     _user: dict = Depends(get_current_user),
 ):
     filters = {}
@@ -21,7 +23,7 @@ async def list_deals(
         filters["priority"] = priority
     if contact_id:
         filters["contact_id"] = contact_id
-    return deals_sheet.get_all(filters or None)
+    return deals_sheet.get_all(filters or None, limit=limit, offset=offset)
 
 
 @router.post("", response_model=Deal, status_code=status.HTTP_201_CREATED)

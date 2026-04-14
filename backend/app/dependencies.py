@@ -1,3 +1,5 @@
+import hmac
+
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
@@ -14,7 +16,7 @@ async def get_current_user(
     # Check X-API-Key header first (service-to-service auth)
     api_key = request.headers.get("X-API-Key")
     if api_key:
-        if settings.voss_api_key and api_key == settings.voss_api_key:
+        if settings.voss_api_key and hmac.compare_digest(api_key, settings.voss_api_key):
             return {"id": "api-service", "username": "api-service"}
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

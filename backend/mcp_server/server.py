@@ -16,13 +16,13 @@ mcp = FastMCP("voss-crm")
 # --- Contacts ---
 
 @mcp.tool()
-async def tool_search_contacts(query: str) -> str:
+async def tool_search_contacts(query: str) :
     """Search contacts by name, email, company, role, or tags."""
     return await asyncio.to_thread(search_contacts, query)
 
 
 @mcp.tool()
-async def tool_get_contact_details(contact_id: str) -> str:
+async def tool_get_contact_details(contact_id: str) :
     """Get full profile for a contact including interactions, deals, and follow-ups."""
     return await asyncio.to_thread(get_contact_details, contact_id)
 
@@ -41,7 +41,7 @@ async def tool_create_contact(
     segment: str = "",
     engagement_stage: str = "new",
     inbound_channel: str = "",
-) -> str:
+) :
     """Create a new contact in the CRM."""
     return await asyncio.to_thread(
         create_contact, first_name, last_name, email, phone,
@@ -60,7 +60,7 @@ async def tool_log_interaction(
     body: str = "",
     direction: str = "",
     deal_id: str = "",
-) -> str:
+) :
     """Log an interaction (call, email, meeting, or note) with a contact."""
     return await asyncio.to_thread(
         log_interaction, contact_id, type, subject, body, direction, deal_id,
@@ -72,7 +72,7 @@ async def tool_get_interaction_history(
     contact_id: str = "",
     deal_id: str = "",
     limit: int = 20,
-) -> str:
+) :
     """Get recent interaction history, optionally filtered by contact or deal."""
     return await asyncio.to_thread(
         get_interaction_history, contact_id, deal_id, limit,
@@ -82,19 +82,19 @@ async def tool_get_interaction_history(
 # --- Deals ---
 
 @mcp.tool()
-async def tool_get_pipeline() -> str:
+async def tool_get_pipeline() :
     """Get an overview of all deals grouped by stage with values."""
     return await asyncio.to_thread(get_pipeline)
 
 
 @mcp.tool()
-async def tool_get_deal(deal_id: str) -> str:
+async def tool_get_deal(deal_id: str) :
     """Get full details about a specific deal."""
     return await asyncio.to_thread(get_deal, deal_id)
 
 
 @mcp.tool()
-async def tool_update_deal_stage(deal_id: str, stage: str) -> str:
+async def tool_update_deal_stage(deal_id: str, stage: str) :
     """Move a deal to a new pipeline stage. Valid stages: lead, prospect, qualified, proposal, negotiation, won, lost."""
     return await asyncio.to_thread(update_deal_stage, deal_id, stage)
 
@@ -110,7 +110,7 @@ async def tool_create_deal(
     priority: str = "medium",
     expected_close: str = "",
     notes: str = "",
-) -> str:
+) :
     """Create a new deal. Accepts contact/company names (resolved automatically)."""
     return await asyncio.to_thread(
         create_deal, title, contact_name, company_name, stage,
@@ -127,7 +127,7 @@ async def tool_promote_contact_to_deal(
     currency: str = "GBP",
     priority: str = "medium",
     notes: str = "",
-) -> str:
+) :
     """Create a deal from a contact, automatically resolving their company. Handy after logging a deal-worthy interaction."""
     return await asyncio.to_thread(
         promote_contact_to_deal, contact_name, title, stage,
@@ -147,7 +147,7 @@ async def tool_update_deal(
     priority: str = "",
     expected_close: str = "",
     notes: str = "",
-) -> str:
+) :
     """Update an existing deal. Only provided fields are changed. Accepts contact/company names."""
     return await asyncio.to_thread(
         update_deal, deal_id, title, contact_name, company_name, stage,
@@ -162,7 +162,7 @@ async def tool_get_follow_ups(
     status: str = "pending",
     overdue_only: bool = False,
     contact_id: str = "",
-) -> str:
+) :
     """Get follow-ups, optionally filtered by status, overdue, or contact."""
     return await asyncio.to_thread(
         get_follow_ups, status, overdue_only, contact_id,
@@ -177,7 +177,7 @@ async def tool_create_follow_up(
     due_time: str = "",
     deal_id: str = "",
     notes: str = "",
-) -> str:
+) :
     """Schedule a new follow-up for a contact. due_date format: YYYY-MM-DD."""
     return await asyncio.to_thread(
         create_follow_up, contact_id, title, due_date, due_time, deal_id, notes,
@@ -185,7 +185,7 @@ async def tool_create_follow_up(
 
 
 @mcp.tool()
-async def tool_complete_follow_up(follow_up_id: str) -> str:
+async def tool_complete_follow_up(follow_up_id: str) :
     """Mark a follow-up as completed."""
     return await asyncio.to_thread(complete_follow_up, follow_up_id)
 
@@ -193,6 +193,6 @@ async def tool_complete_follow_up(follow_up_id: str) -> str:
 # --- Dashboard ---
 
 @mcp.tool()
-async def tool_get_dashboard_summary() -> str:
+async def tool_get_dashboard_summary() :
     """Get a high-level CRM dashboard: pipeline summary, overdue follow-ups, today's tasks, and recent activity."""
     return await asyncio.to_thread(get_dashboard_summary)

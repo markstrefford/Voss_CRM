@@ -1,7 +1,16 @@
 import axios from 'axios';
 
+const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
+if (import.meta.env.PROD && apiUrl && !apiUrl.startsWith('https://')) {
+  console.warn(
+    `[Voss CRM] VITE_API_URL does not use HTTPS: "${apiUrl}". ` +
+    'This is insecure for production deployments.'
+  );
+}
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000',
+  baseURL: apiUrl,
 });
 
 api.interceptors.request.use((config) => {

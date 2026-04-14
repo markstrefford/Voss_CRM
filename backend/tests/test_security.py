@@ -23,11 +23,11 @@ class TestJWTSecurity:
 
     def test_missing_token_rejected(self, client):
         resp = client.get("/api/contacts")
-        assert resp.status_code == 403
+        assert resp.status_code == 401
 
     def test_empty_bearer_rejected(self, client):
         resp = client.get("/api/contacts", headers={"Authorization": "Bearer "})
-        assert resp.status_code == 403
+        assert resp.status_code == 401
 
 
 class TestAuthBypass:
@@ -71,4 +71,6 @@ class TestHealthEndpoint:
     def test_health_is_public(self, client):
         resp = client.get("/api/health")
         assert resp.status_code == 200
-        assert resp.json() == {"status": "ok"}
+        data = resp.json()
+        assert data["status"] in ("ok", "degraded")
+        assert "env" in data

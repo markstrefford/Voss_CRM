@@ -67,6 +67,8 @@ async def list_interactions(
     contact_id: str | None = Query(None),
     deal_id: str | None = Query(None),
     type: str | None = Query(None),
+    limit: int | None = Query(None, ge=1, le=500),
+    offset: int | None = Query(None, ge=0),
     _user: dict = Depends(get_current_user),
 ):
     filters = {}
@@ -76,7 +78,7 @@ async def list_interactions(
         filters["deal_id"] = deal_id
     if type:
         filters["type"] = type
-    return interactions_sheet.get_all(filters or None)
+    return interactions_sheet.get_all(filters or None, limit=limit, offset=offset)
 
 
 @router.post("", response_model=InteractionCreateResponse, status_code=status.HTTP_201_CREATED)
