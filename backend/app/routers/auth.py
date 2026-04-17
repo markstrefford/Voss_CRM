@@ -3,7 +3,7 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
-from app.auth import create_access_token, hash_password, verify_password
+from app.auth import create_access_token, decode_access_token_allow_expired, hash_password, verify_password
 from app.config import settings
 from app.dependencies import get_current_user
 from app.limiter import limiter
@@ -54,6 +54,19 @@ async def register(request: Request, body: UserCreate):
     logger.info(f"New user registered: user={body.username!r} from ip={client_ip}")
     token = create_access_token({"sub": user["id"], "username": user["username"]})
     return {"access_token": token, "token_type": "bearer"}
+
+
+@router.post("/refresh")
+async def refresh(request: Request):
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing token")
+    token = auth_header.removeprefix("Bearer ").strip()
+    payload = decode_access_token_allow_expired(token)
+    if not payload or not payload.get("sub"):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token cannot be refreshed")
+    new_token = create_access_token({"sub": payload["sub"], "username": payload.get("username")})
+    return {"access_token": new_token, "token_type": "bearer"}
 
 
 @router.get("/me", response_model=User)

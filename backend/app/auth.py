@@ -33,3 +33,24 @@ def decode_access_token(token: str) -> dict | None:
         return payload
     except JWTError:
         return None
+
+
+def decode_access_token_allow_expired(token: str, grace_minutes: int = 1440) -> dict | None:
+    """Decode a token even if expired, within a grace period. Signature is still verified."""
+    try:
+        payload = jwt.decode(
+            token,
+            settings.jwt_secret_key,
+            algorithms=[settings.jwt_algorithm],
+            options={"verify_exp": False},
+        )
+        exp = payload.get("exp")
+        if exp is None:
+            return None
+        expired_at = datetime.fromtimestamp(exp, tz=timezone.utc)
+        now = datetime.now(timezone.utc)
+        if now > expired_at + timedelta(minutes=grace_minutes):
+            return None  # Too long ago — force re-login
+        return payload
+    except JWTError:
+        return None

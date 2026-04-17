@@ -95,25 +95,64 @@ async function handleLogin({ apiUrl, username, password }) {
   return { success: true, access_token: data.access_token };
 }
 
-async function handleApiRequest({ method, path, body }) {
+let refreshInFlight = null;
+
+async function refreshToken(apiUrl, currentToken) {
+  if (refreshInFlight) return refreshInFlight;
+  refreshInFlight = (async () => {
+    try {
+      const resp = await fetch(`${apiUrl}/api/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${currentToken}` },
+      });
+      if (!resp.ok) return null;
+      const data = await resp.json();
+      if (!data.access_token) return null;
+      await chrome.storage.local.set({ token: data.access_token });
+      return data.access_token;
+    } catch {
+      return null;
+    } finally {
+      // Clear after a tick so concurrent callers share the same promise
+      setTimeout(() => { refreshInFlight = null; }, 0);
+    }
+  })();
+  return refreshInFlight;
+}
+
+async function authFetch(path, init = {}) {
   const { token, apiUrl } = await chrome.storage.local.get(['token', 'apiUrl']);
   if (!token || !apiUrl) {
     throw new Error('Not logged in');
   }
 
-  const options = {
-    method: method || 'GET',
+  const buildOptions = (t) => ({
+    ...init,
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
+      ...(init.headers || {}),
+      'Authorization': `Bearer ${t}`,
     },
-  };
+  });
 
-  if (body) {
-    options.body = JSON.stringify(body);
+  let resp = await fetch(`${apiUrl}${path}`, buildOptions(token));
+
+  if (resp.status === 401) {
+    const newToken = await refreshToken(apiUrl, token);
+    if (!newToken) {
+      throw new Error('Session expired — please log in again');
+    }
+    resp = await fetch(`${apiUrl}${path}`, buildOptions(newToken));
   }
 
-  const resp = await fetch(`${apiUrl}${path}`, options);
+  return resp;
+}
+
+async function handleApiRequest({ method, path, body }) {
+  const resp = await authFetch(path, {
+    method: method || 'GET',
+    body: body ? JSON.stringify(body) : undefined,
+  });
   const data = await resp.json();
 
   if (!resp.ok) {
@@ -130,22 +169,15 @@ async function handleApiRequest({ method, path, body }) {
 }
 
 async function handleCaptureEngagements(items) {
-  const { token, apiUrl } = await chrome.storage.local.get(['token', 'apiUrl']);
-  if (!token || !apiUrl) {
-    throw new Error('Not logged in');
-  }
-
   const results = [];
   const captured = await getRecentlyCaptured();
 
   for (const item of items) {
-    // Check dedup
     if (isAlreadyCaptured(captured, item)) {
       results.push({ item, status: 'duplicate' });
       continue;
     }
 
-    // Build engagement event
     const event = {
       platform: 'linkedin',
       person: {
@@ -163,17 +195,13 @@ async function handleCaptureEngagements(items) {
     };
 
     try {
-      const resp = await fetch(`${apiUrl}/api/social/capture`, {
+      const resp = await authFetch('/api/social/capture', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
         body: JSON.stringify(event),
       });
 
       if (!resp.ok) {
-        const err = await resp.json();
+        const err = await resp.json().catch(() => ({}));
         results.push({ item, status: 'error', error: err.detail || `HTTP ${resp.status}` });
         continue;
       }
@@ -181,7 +209,6 @@ async function handleCaptureEngagements(items) {
       const data = await resp.json();
       results.push({ item, status: 'captured', data });
 
-      // Record in dedup store
       await recordCapture(item);
     } catch (err) {
       results.push({ item, status: 'error', error: err.message });
@@ -192,17 +219,8 @@ async function handleCaptureEngagements(items) {
 }
 
 async function handleBatchLookup(items) {
-  const { token, apiUrl } = await chrome.storage.local.get(['token', 'apiUrl']);
-  if (!token || !apiUrl) {
-    throw new Error('Not logged in');
-  }
-
-  const resp = await fetch(`${apiUrl}/api/social/batch-lookup`, {
+  const resp = await authFetch('/api/social/batch-lookup', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-    },
     body: JSON.stringify({
       items: items.map(i => ({
         handle: i.profileUrl || '',
