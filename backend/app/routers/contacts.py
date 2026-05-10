@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 import json
 
 from app.dependencies import get_current_user
-from app.helpers import parse_platform_handles
+from app.helpers import parse_platform_handles, resolve_or_create_company
 from app.models import Contact, ContactCreate, ContactFromLinkedIn, ContactUpdate
 from app.services.sheet_service import companies_sheet, contacts_sheet
 
@@ -46,7 +46,14 @@ async def create_contact(
     body: ContactCreate,
     _user: dict = Depends(get_current_user),
 ):
-    record = contacts_sheet.create(body.model_dump())
+    data = body.model_dump()
+    # company_name wins over company_id when both are supplied — the resolved
+    # value reflects intent more reliably than an opaque id the caller may have
+    # picked up stale.
+    name = data.pop("company_name", "")
+    if name:
+        data["company_id"] = resolve_or_create_company(companies_sheet, name)
+    record = contacts_sheet.create(data)
     return record
 
 
@@ -68,6 +75,9 @@ async def update_contact(
     _user: dict = Depends(get_current_user),
 ):
     update_data = body.model_dump(exclude_none=True)
+    name = update_data.pop("company_name", "")
+    if name:
+        update_data["company_id"] = resolve_or_create_company(companies_sheet, name)
     record = contacts_sheet.update(contact_id, update_data)
     if not record:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contact not found")
@@ -101,15 +111,7 @@ async def create_from_linkedin(
         record = contacts_sheet.update(existing["id"], update_data)
         return record
 
-    # Resolve company
-    company_id = ""
-    if body.company_name:
-        company = companies_sheet.find_by_field("name", body.company_name)
-        if company:
-            company_id = company["id"]
-        else:
-            new_company = companies_sheet.create({"name": body.company_name})
-            company_id = new_company["id"]
+    company_id = resolve_or_create_company(companies_sheet, body.company_name)
 
     record = contacts_sheet.create({
         "first_name": body.first_name,

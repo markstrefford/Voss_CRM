@@ -39,6 +39,18 @@ def find_contact_by_handle(contacts_sheet, platform: str, handle: str) -> dict |
     return None
 
 
+def resolve_or_create_company(companies_sheet, name: str) -> str:
+    """Resolve a company name to an existing company id, or create a new
+    company row with that name and return its id. Empty/whitespace-only
+    names return ""; callers treat that as 'no resolution requested'."""
+    if not name or not name.strip():
+        return ""
+    existing = companies_sheet.find_by_field("name", name)
+    if existing:
+        return existing["id"]
+    return companies_sheet.create({"name": name})["id"]
+
+
 def today_str() -> str:
     """Return today's date as a YYYY-MM-DD string (UTC)."""
     return datetime.now(timezone.utc).strftime("%Y-%m-%d")

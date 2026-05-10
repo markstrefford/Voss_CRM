@@ -6,15 +6,13 @@ from fastapi.testclient import TestClient
 from app.auth import create_access_token, hash_password
 
 
-@pytest.fixture
-def mock_worksheet():
-    """Mock gspread worksheet with in-memory data."""
+def _make_mock_worksheet():
+    """Build an independent in-memory mock gspread worksheet."""
     ws = MagicMock()
     ws._data = []
     ws._headers = []
 
     def row_values(row_num):
-        """Return headers for row 1 (used by _sheet_columns)."""
         if row_num == 1:
             return ws._headers
         return []
@@ -34,8 +32,11 @@ def mock_worksheet():
     def append_row(row, **kwargs):
         ws._data.append(row)
 
+    def append_rows(rows, **kwargs):
+        ws._data.extend(rows)
+
     def delete_rows(idx):
-        ws._data.pop(idx - 2)  # -2 for header + 1-indexed
+        ws._data.pop(idx - 2)
 
     def update(range_str, values):
         import re
@@ -48,9 +49,22 @@ def mock_worksheet():
     ws.row_values = row_values
     ws.get_all_records = get_all_records
     ws.append_row = append_row
+    ws.append_rows = append_rows
     ws.delete_rows = delete_rows
     ws.update = update
     return ws
+
+
+@pytest.fixture
+def mock_worksheet():
+    """Single in-memory mock worksheet."""
+    return _make_mock_worksheet()
+
+
+@pytest.fixture
+def make_mock_worksheet():
+    """Factory for producing additional independent worksheets within a test."""
+    return _make_mock_worksheet
 
 
 @pytest.fixture
@@ -89,6 +103,32 @@ def seeded_users_ws(mock_worksheet):
         "test-id", "testuser", hash_password("testpassword123"), "", "2024-01-01T00:00:00"
     ])
     return mock_worksheet
+
+
+@pytest.fixture
+def seeded_companies_ws(make_mock_worksheet):
+    """Mock companies worksheet with two pre-seeded companies."""
+    from app.services.sheet_service import COMPANIES_COLUMNS
+    ws = make_mock_worksheet()
+    ws._headers = COMPANIES_COLUMNS
+    ws._data.append([
+        "comp1", "Acme Corp", "manufacturing", "https://acme.example",
+        "100-500", "", "2024-01-01T00:00:00", "2024-01-01T00:00:00",
+    ])
+    ws._data.append([
+        "comp2", "Existing Ltd", "consulting", "https://existing.example",
+        "10-50", "", "2024-01-02T00:00:00", "2024-01-02T00:00:00",
+    ])
+    return ws
+
+
+@pytest.fixture
+def empty_companies_ws(make_mock_worksheet):
+    """Mock companies worksheet with no rows seeded."""
+    from app.services.sheet_service import COMPANIES_COLUMNS
+    ws = make_mock_worksheet()
+    ws._headers = COMPANIES_COLUMNS
+    return ws
 
 
 @pytest.fixture
