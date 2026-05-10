@@ -88,3 +88,37 @@ class TestUpdateCompany:
         for field in ("name", "industry", "website", "size", "notes"):
             assert field in CompanyUpdate.model_fields, \
                 f"CompanyUpdate must declare {field} so Pydantic doesn't drop it"
+
+
+class TestUpdateInteraction:
+    """t04 — `update_interaction` wraps PUT /api/interactions/{id}."""
+
+    def test_sends_only_non_empty_fields(self):
+        from mcp_server.tools.interactions import update_interaction
+        with patch("mcp_server.tools.interactions.api_put") as mock_put:
+            mock_put.return_value = {"id": "i1", "subject": "Updated subject"}
+            update_interaction(interaction_id="i1", subject="Updated subject", body="")
+        mock_put.assert_called_once_with(
+            "/api/interactions/i1", {"subject": "Updated subject"},
+        )
+
+    def test_returns_confirmation_with_subject(self):
+        from mcp_server.tools.interactions import update_interaction
+        with patch("mcp_server.tools.interactions.api_put") as mock_put:
+            mock_put.return_value = {"id": "i1", "subject": "Initial call"}
+            result = update_interaction(interaction_id="i1", subject="Initial call")
+        assert "Initial call" in result or "i1" in result
+
+    def test_no_fields_returns_message_without_api_call(self):
+        from mcp_server.tools.interactions import update_interaction
+        with patch("mcp_server.tools.interactions.api_put") as mock_put:
+            result = update_interaction(interaction_id="i1")
+        assert result == "No fields to update."
+        mock_put.assert_not_called()
+
+    def test_interaction_update_model_accepts_all_documented_fields(self):
+        """Anti-silent-drop guard."""
+        from app.models.interaction import InteractionUpdate
+        for field in ("type", "subject", "body", "direction", "url", "occurred_at"):
+            assert field in InteractionUpdate.model_fields, \
+                f"InteractionUpdate must declare {field}"

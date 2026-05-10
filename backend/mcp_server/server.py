@@ -6,7 +6,7 @@ from mcp.server.fastmcp import FastMCP
 
 from mcp_server.tools.companies import update_company
 from mcp_server.tools.contacts import get_contact_details, create_contact, update_contact
-from mcp_server.tools.interactions import log_interaction, get_interaction_history
+from mcp_server.tools.interactions import log_interaction, get_interaction_history, update_interaction
 from mcp_server.tools.deals import get_pipeline, get_deal, update_deal_stage, create_deal, update_deal, promote_contact_to_deal
 from mcp_server.tools.follow_ups import get_follow_ups, create_follow_up, complete_follow_up
 from mcp_server.tools.dashboard import get_dashboard_summary
@@ -137,6 +137,25 @@ async def tool_get_interaction_history(
     """Get recent interaction history, optionally filtered by contact or deal."""
     return await asyncio.to_thread(
         get_interaction_history, contact_id, deal_id, limit,
+    )
+
+
+@mcp.tool()
+async def tool_update_interaction(
+    interaction_id: str,
+    type: str = "",
+    subject: str = "",
+    body: str = "",
+    direction: str = "",
+    url: str = "",
+    occurred_at: str = "",
+) :
+    """Amend a previously-logged interaction — typo fixes, body additions,
+    direction correction. Prefer this over logging a duplicate interaction
+    when the right thing is to update an existing record."""
+    return await asyncio.to_thread(
+        update_interaction, interaction_id, type, subject, body,
+        direction, url, occurred_at,
     )
 
 

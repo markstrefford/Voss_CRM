@@ -1,6 +1,29 @@
 """Interaction tools — calls VOSS API over HTTP."""
 
-from mcp_server.api_client import api_get, api_post
+from mcp_server.api_client import api_get, api_post, api_put
+
+
+_UPDATE_FIELDS = ("type", "subject", "body", "direction", "url", "occurred_at")
+
+
+def update_interaction(
+    interaction_id: str,
+    type: str = "",
+    subject: str = "",
+    body: str = "",
+    direction: str = "",
+    url: str = "",
+    occurred_at: str = "",
+) -> str:
+    """Update a logged interaction — typo fixes, body additions, direction
+    correction. Use this rather than logging a duplicate interaction when
+    the right thing is to amend an existing record."""
+    payload = {k: v for k, v in locals().items() if k in _UPDATE_FIELDS and v}
+    if not payload:
+        return "No fields to update."
+    record = api_put(f"/api/interactions/{interaction_id}", payload)
+    subj = record.get("subject") or "(no subject)"
+    return f"Updated interaction \"{subj}\" (ID: {interaction_id})."
 
 
 def log_interaction(
