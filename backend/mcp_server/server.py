@@ -4,6 +4,7 @@ import asyncio
 
 from mcp.server.fastmcp import FastMCP
 
+from mcp_server.tools.companies import update_company
 from mcp_server.tools.contacts import get_contact_details, create_contact, update_contact
 from mcp_server.tools.interactions import log_interaction, get_interaction_history
 from mcp_server.tools.deals import get_pipeline, get_deal, update_deal_stage, create_deal, update_deal, promote_contact_to_deal
@@ -87,6 +88,26 @@ async def tool_create_contact(
         create_contact, first_name, last_name, email, phone,
         role, company_name, source, tags, notes,
         segment, engagement_stage, inbound_channel,
+    )
+
+
+# --- Companies ---
+
+@mcp.tool()
+async def tool_update_company(
+    company_id: str,
+    name: str = "",
+    industry: str = "",
+    website: str = "",
+    size: str = "",
+    notes: str = "",
+) :
+    """Update a company record's structured fields (industry, website, size,
+    notes, or rename). Use this when you've learned something about a
+    company so the fact lands on the company entity, not buried in an
+    interaction note."""
+    return await asyncio.to_thread(
+        update_company, company_id, name, industry, website, size, notes,
     )
 
 
