@@ -6,29 +6,6 @@ from mcp_server.api_client import api_get, api_post
 from mcp_server.helpers import contact_name, format_currency
 
 
-def search_contacts(query: str) -> str:
-    results = api_get("/api/contacts", {"q": query})
-    if not results:
-        return f"No contacts found for '{query}'."
-
-    lines = [f"Found {len(results)} contact(s) for '{query}':\n"]
-    for c in results:
-        name = contact_name(c)
-        parts = [f"- **{name}** (ID: {c['id']})"]
-        if c.get("role"):
-            parts.append(f"  Role: {c['role']}")
-        if c.get("company_name"):
-            parts.append(f"  Company: {c['company_name']}")
-        if c.get("email"):
-            parts.append(f"  Email: {c['email']}")
-        if c.get("phone"):
-            parts.append(f"  Phone: {c['phone']}")
-        if c.get("tags"):
-            parts.append(f"  Tags: {c['tags']}")
-        lines.append("\n".join(parts))
-    return "\n".join(lines)
-
-
 def get_contact_details(contact_id: str) -> str:
     contact = api_get(f"/api/contacts/{contact_id}")
     name = contact_name(contact)

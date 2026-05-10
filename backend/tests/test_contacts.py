@@ -16,14 +16,6 @@ class TestContactEndpoints:
         resp = client.get("/api/contacts")
         assert resp.status_code == 401
 
-    def test_search_contacts(self, client, auth_headers, seeded_contacts_ws):
-        with patch("app.routers.contacts.contacts_sheet._worksheet", return_value=seeded_contacts_ws):
-            resp = client.get("/api/contacts?q=John", headers=auth_headers)
-            assert resp.status_code == 200
-            data = resp.json()
-            assert len(data) == 1
-            assert data[0]["first_name"] == "John"
-
     def test_filter_by_tag(self, client, auth_headers, seeded_contacts_ws):
         with patch("app.routers.contacts.contacts_sheet._worksheet", return_value=seeded_contacts_ws):
             resp = client.get("/api/contacts?tag=vip", headers=auth_headers)

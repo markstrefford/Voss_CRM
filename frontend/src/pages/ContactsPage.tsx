@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getContacts, createContact, deleteContact } from '@/api';
+import { getContacts, createContact, deleteContact, searchVoss } from '@/api';
 import type { Contact } from '@/types';
 import { useDebounce } from '@/hooks/useDebounce';
 import { SearchBar } from '@/components/shared/SearchBar';
@@ -27,11 +27,11 @@ export function ContactsPage() {
   const navigate = useNavigate();
 
   const load = () => {
-    const params: Record<string, string> = {};
-    if (debouncedSearch) params.q = debouncedSearch;
-    getContacts(params)
-      .then(res => setContacts(res.data))
-      .finally(() => setLoading(false));
+    setLoading(true);
+    const req = debouncedSearch
+      ? searchVoss(debouncedSearch).then(res => res.data.contacts as Contact[])
+      : getContacts().then(res => res.data);
+    req.then(setContacts).finally(() => setLoading(false));
   };
 
   useEffect(() => { load(); }, [debouncedSearch]);

@@ -12,7 +12,6 @@ router = APIRouter(prefix="/api/contacts", tags=["contacts"])
 
 @router.get("", response_model=list[Contact])
 async def list_contacts(
-    q: str | None = Query(None),
     tag: str | None = Query(None),
     status_filter: str | None = Query(None, alias="status"),
     company_id: str | None = Query(None),
@@ -22,27 +21,20 @@ async def list_contacts(
     offset: int | None = Query(None, ge=0),
     _user: dict = Depends(get_current_user),
 ):
-    if q:
-        records = contacts_sheet.search(q, [
-            "first_name", "last_name", "email", "company_id", "tags", "notes",
-            "segment", "engagement_stage", "platform_handles",
-        ])
-    else:
-        filters = {}
-        if status_filter:
-            filters["status"] = status_filter
-        if company_id:
-            filters["company_id"] = company_id
-        if segment:
-            filters["segment"] = segment
-        if engagement_stage:
-            filters["engagement_stage"] = engagement_stage
-        records = contacts_sheet.get_all(filters or None, limit=limit, offset=offset)
+    filters = {}
+    if status_filter:
+        filters["status"] = status_filter
+    if company_id:
+        filters["company_id"] = company_id
+    if segment:
+        filters["segment"] = segment
+    if engagement_stage:
+        filters["engagement_stage"] = engagement_stage
+    records = contacts_sheet.get_all(filters or None, limit=limit, offset=offset)
 
     if tag:
         records = [r for r in records if tag.lower() in r.get("tags", "").lower()]
 
-    # Exclude archived unless specifically requested
     if not status_filter:
         records = [r for r in records if r.get("status") != "archived"]
 

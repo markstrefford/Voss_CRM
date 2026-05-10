@@ -1,5 +1,5 @@
 import api from './client';
-import type { Contact, Company, Deal, DashboardSummary, ActionFeed, EmailDraft, FollowUp, Interaction, NotificationItem } from '@/types';
+import type { Contact, Company, Deal, DashboardSummary, ActionFeed, EmailDraft, FollowUp, Interaction, NotificationItem, SearchResult } from '@/types';
 
 // Auth
 export const login = (username: string, password: string) =>
@@ -102,3 +102,7 @@ export const resolveNotification = (id: string, action: string) =>
 // Email
 export const generateEmailDraft = (data: { contact_id: string; deal_id?: string; intent: string; tone: string }) =>
   api.post<EmailDraft>('/api/email/draft', data);
+
+// Unified search — returns hits across all VOSS entity types with FKs resolved
+export const searchVoss = (q: string) =>
+  api.get<SearchResult>('/api/search', { params: { q } });

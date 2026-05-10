@@ -4,22 +4,28 @@ import asyncio
 
 from mcp.server.fastmcp import FastMCP
 
-from mcp_server.tools.contacts import search_contacts, get_contact_details, create_contact
+from mcp_server.tools.contacts import get_contact_details, create_contact
 from mcp_server.tools.interactions import log_interaction, get_interaction_history
 from mcp_server.tools.deals import get_pipeline, get_deal, update_deal_stage, create_deal, update_deal, promote_contact_to_deal
 from mcp_server.tools.follow_ups import get_follow_ups, create_follow_up, complete_follow_up
 from mcp_server.tools.dashboard import get_dashboard_summary
+from mcp_server.tools.search import search as search_voss
 
 mcp = FastMCP("voss-crm")
 
 
-# --- Contacts ---
+# --- Search ---
 
 @mcp.tool()
-async def tool_search_contacts(query: str) :
-    """Search contacts by name, email, company, role, or tags."""
-    return await asyncio.to_thread(search_contacts, query)
+async def tool_search(query: str) :
+    """Unified VOSS search across companies, contacts, deals, interactions, and follow-ups.
+    Resolves foreign keys, so a query for a company name surfaces contacts, deals, interactions, and
+    follow-ups that reference it — not just rows whose own fields contain the literal token.
+    Use this whenever you need to know what VOSS knows about a person, company, or topic."""
+    return await asyncio.to_thread(search_voss, query)
 
+
+# --- Contacts ---
 
 @mcp.tool()
 async def tool_get_contact_details(contact_id: str) :
