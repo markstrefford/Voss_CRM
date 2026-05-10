@@ -1,5 +1,9 @@
 # Claude Code Configuration - Voss CRM
 
+## Workflow
+
+This repo follows the SDLC defined in `sdlc/SDLC.md`. Read it at the start of every session — it covers capture/compile/plan/execute/verify/file, the `/raw/` → `/work/` → `/docs/` flow, ID conventions, and the hard rules. Current state lives in `sdlc/STATE-voss-crm.md`.
+
 ## Project Structure
 
 - **Backend**: FastAPI + Google Sheets (`backend/`)
