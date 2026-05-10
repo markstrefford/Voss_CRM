@@ -4,7 +4,7 @@ import asyncio
 
 from mcp.server.fastmcp import FastMCP
 
-from mcp_server.tools.contacts import get_contact_details, create_contact
+from mcp_server.tools.contacts import get_contact_details, create_contact, update_contact
 from mcp_server.tools.interactions import log_interaction, get_interaction_history
 from mcp_server.tools.deals import get_pipeline, get_deal, update_deal_stage, create_deal, update_deal, promote_contact_to_deal
 from mcp_server.tools.follow_ups import get_follow_ups, create_follow_up, complete_follow_up
@@ -31,6 +31,40 @@ async def tool_search(query: str) :
 async def tool_get_contact_details(contact_id: str) :
     """Get full profile for a contact including interactions, deals, and follow-ups."""
     return await asyncio.to_thread(get_contact_details, contact_id)
+
+
+@mcp.tool()
+async def tool_update_contact(
+    contact_id: str,
+    first_name: str = "",
+    last_name: str = "",
+    email: str = "",
+    phone: str = "",
+    role: str = "",
+    linkedin_url: str = "",
+    platform_handles: str = "",
+    urls: str = "",
+    company_name: str = "",
+    company_id: str = "",
+    tags: str = "",
+    notes: str = "",
+    segment: str = "",
+    engagement_stage: str = "",
+    inbound_channel: str = "",
+    do_not_contact: str = "",
+) :
+    """Update any structured field on an existing contact (email, phone, role,
+    company, segment, engagement stage, linkedin, do_not_contact, etc.). Use
+    this — not log_interaction — when capturing a structured fact about a
+    contact. company_name is resolved server-side and the company is created
+    automatically if it doesn't exist."""
+    return await asyncio.to_thread(
+        update_contact, contact_id, first_name, last_name, email, phone,
+        role, linkedin_url, platform_handles, urls,
+        company_name, company_id,
+        tags, notes, segment, engagement_stage,
+        inbound_channel, do_not_contact,
+    )
 
 
 @mcp.tool()
