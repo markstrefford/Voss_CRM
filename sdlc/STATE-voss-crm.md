@@ -1,11 +1,12 @@
-# State — last updated 2026-05-09
+# State — last updated 2026-05-11
 
-**Active focus:** `e01-s01-mcp-write-surface` planned (5 tasks); awaiting operator review before Execute.
-**Last completed:** Planned `e01-s01-mcp-write-surface` — five task artefacts written with ACs and test specs (t01 → t05).
-**Next:** Operator reviews/edits the plan, then Execute starts at `e01-s01-t01-api-company-name-resolution` (blocking dependency for t02).
+**Active focus:** Story `e01-s01-mcp-write-surface` shipped (5 tasks, 5 commits, +24 tests, verifier PASS). Branch `security-hardening-modal-deploy` ready for deploy.
+**Last completed:** `e01-s01-t05-mcp-update-snooze-follow-up` — closed the last write-side gap. Story moved to `/work/done/`.
+**Next:** Deploy + confirm. Then decide on `e01` epic close-out (retroactive filing of read-side / unified-search work).
 
 ## Open questions
 
-- `project:` field on artefacts uses `voss-crm`, not in SDLC's listed values (`constellation | signalstrata | agent-os`). Add as a new project, or slot under an existing one?
-- Unified-search diff (read-side, sibling of this epic) still uncommitted on `security-hardening-modal-deploy`; `raw/unified-search-fix.md` is its capture. Commit before filing to `/work/done/` under `e01`, or compile-then-commit?
-- ADR for SDLC adoption itself — file now or wait for first real architectural decision?
+- **Deploy gate:** Modal container needs redeploy with the new search + write-surface code; Claude Desktop MCP server needs restart so `tool_search` and the five new `tool_update_*`/`tool_snooze_*` tools register. The "API error 404" Claude app saw on search was pre-redeploy; confirm post-redeploy.
+- **Retroactive `e01-s01` for the read side:** unified-search work (commits `0f3e95c`, `007c193`) lives in git but has no `/work/done/` artefact under `e01`. Compile `sdlc/raw/unified-search-fix.md` into a `done` artefact to close out the epic, or leave the raw note as the audit record?
+- **Project field on artefacts:** still using `voss-crm` (not in SDLC's listed `constellation | signalstrata | agent-os`). Add as a known project value or slot under existing?
+- **Tool docstring polish (verifier nice-to-have):** `tool_create_contact`'s docstring doesn't mention `company_name` resolution, only `tool_update_contact`'s does. Small parity fix, file as a follow-up task if worth doing.
