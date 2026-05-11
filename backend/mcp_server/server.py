@@ -8,7 +8,10 @@ from mcp_server.tools.companies import update_company
 from mcp_server.tools.contacts import get_contact_details, create_contact, update_contact
 from mcp_server.tools.interactions import log_interaction, get_interaction_history, update_interaction
 from mcp_server.tools.deals import get_pipeline, get_deal, update_deal_stage, create_deal, update_deal, promote_contact_to_deal
-from mcp_server.tools.follow_ups import get_follow_ups, create_follow_up, complete_follow_up
+from mcp_server.tools.follow_ups import (
+    get_follow_ups, create_follow_up, complete_follow_up,
+    update_follow_up, snooze_follow_up,
+)
 from mcp_server.tools.dashboard import get_dashboard_summary
 from mcp_server.tools.search import search as search_voss
 
@@ -268,6 +271,39 @@ async def tool_create_follow_up(
 async def tool_complete_follow_up(follow_up_id: str) :
     """Mark a follow-up as completed."""
     return await asyncio.to_thread(complete_follow_up, follow_up_id)
+
+
+@mcp.tool()
+async def tool_update_follow_up(
+    follow_up_id: str,
+    title: str = "",
+    due_date: str = "",
+    due_time: str = "",
+    notes: str = "",
+    status: str = "",
+) :
+    """Update an existing follow-up's title, due date/time, notes, or status.
+    For rescheduling specifically (which sets status to 'snoozed' and clears
+    reminder_sent so the new date triggers a fresh notification), use
+    tool_snooze_follow_up — its side-effects matter for downstream alerting."""
+    return await asyncio.to_thread(
+        update_follow_up, follow_up_id, title, due_date, due_time, notes, status,
+    )
+
+
+@mcp.tool()
+async def tool_snooze_follow_up(
+    follow_up_id: str,
+    due_date: str,
+    due_time: str = "",
+) :
+    """Reschedule a follow-up to a new date (YYYY-MM-DD) and optional time.
+    Sets status='snoozed' and clears reminder_sent so the new due date
+    triggers a fresh notification. Use this rather than tool_update_follow_up
+    for reschedule operations."""
+    return await asyncio.to_thread(
+        snooze_follow_up, follow_up_id, due_date, due_time,
+    )
 
 
 # --- Dashboard ---

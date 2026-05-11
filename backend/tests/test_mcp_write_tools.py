@@ -122,3 +122,61 @@ class TestUpdateInteraction:
         for field in ("type", "subject", "body", "direction", "url", "occurred_at"):
             assert field in InteractionUpdate.model_fields, \
                 f"InteractionUpdate must declare {field}"
+
+
+class TestUpdateFollowUp:
+    """t05a — `update_follow_up` wraps PUT /api/follow-ups/{id}."""
+
+    def test_sends_only_non_empty_fields(self):
+        from mcp_server.tools.follow_ups import update_follow_up
+        with patch("mcp_server.tools.follow_ups.api_put") as mock_put:
+            mock_put.return_value = {"id": "f1", "title": "Send proposal"}
+            update_follow_up(follow_up_id="f1", title="Send proposal", notes="")
+        mock_put.assert_called_once_with(
+            "/api/follow-ups/f1", {"title": "Send proposal"},
+        )
+
+    def test_no_fields_returns_message_without_api_call(self):
+        from mcp_server.tools.follow_ups import update_follow_up
+        with patch("mcp_server.tools.follow_ups.api_put") as mock_put:
+            result = update_follow_up(follow_up_id="f1")
+        assert result == "No fields to update."
+        mock_put.assert_not_called()
+
+    def test_returns_confirmation(self):
+        from mcp_server.tools.follow_ups import update_follow_up
+        with patch("mcp_server.tools.follow_ups.api_put") as mock_put:
+            mock_put.return_value = {"id": "f1", "title": "Send proposal"}
+            result = update_follow_up(follow_up_id="f1", title="Send proposal")
+        assert "Send proposal" in result
+
+
+class TestSnoozeFollowUp:
+    """t05b — `snooze_follow_up` wraps PATCH /api/follow-ups/{id}/snooze.
+    Distinct from update_follow_up because snooze has the side-effect of
+    setting status='snoozed' and reminder_sent=FALSE; the explicit tool
+    keeps that intent visible to the agent."""
+
+    def test_hits_patch_snooze_path_with_due_date(self):
+        from mcp_server.tools.follow_ups import snooze_follow_up
+        with patch("mcp_server.tools.follow_ups.api_patch") as mock_patch:
+            mock_patch.return_value = {"id": "f1", "title": "Send proposal"}
+            snooze_follow_up(follow_up_id="f1", due_date="2026-06-01")
+        mock_patch.assert_called_once_with(
+            "/api/follow-ups/f1/snooze", {"due_date": "2026-06-01", "due_time": ""},
+        )
+
+    def test_includes_due_time_when_provided(self):
+        from mcp_server.tools.follow_ups import snooze_follow_up
+        with patch("mcp_server.tools.follow_ups.api_patch") as mock_patch:
+            mock_patch.return_value = {"id": "f1", "title": "Send proposal"}
+            snooze_follow_up(follow_up_id="f1", due_date="2026-06-01", due_time="14:00")
+        called_args = mock_patch.call_args.args
+        assert called_args[1]["due_time"] == "14:00"
+
+    def test_requires_due_date(self):
+        from mcp_server.tools.follow_ups import snooze_follow_up
+        with patch("mcp_server.tools.follow_ups.api_patch") as mock_patch:
+            with pytest.raises(ValueError):
+                snooze_follow_up(follow_up_id="f1", due_date="")
+        mock_patch.assert_not_called()
