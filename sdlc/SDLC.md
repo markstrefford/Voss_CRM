@@ -43,7 +43,7 @@ Compiled artefacts (anything in `/work/` or `/docs/`) have YAML frontmatter:
     ---
     id: stable-id
     kind: task | story | epic | decision | runbook | strategy | architecture
-    project: constellation | signalstrata | agent-os
+    project: <repo-slug>                  # the repo this artefact belongs to
     status: active | blocked | done       # for /work/ items only
     parent: optional-parent-id            # when relationships exist
     children: [optional-child-ids]        # when relationships exist

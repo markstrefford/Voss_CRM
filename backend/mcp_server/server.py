@@ -86,7 +86,8 @@ async def tool_create_contact(
     engagement_stage: str = "new",
     inbound_channel: str = "",
 ) :
-    """Create a new contact in the CRM."""
+    """Create a new contact in the CRM. company_name is resolved server-side
+    and the company is created automatically if it doesn't exist."""
     return await asyncio.to_thread(
         create_contact, first_name, last_name, email, phone,
         role, company_name, source, tags, notes,
