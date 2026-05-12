@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field
 
 class ContactCreate(BaseModel):
     company_id: str = ""
+    company_name: str = ""
     first_name: str = Field(..., min_length=1)
     last_name: str = ""
     email: str = ""
@@ -25,6 +26,7 @@ class ContactCreate(BaseModel):
 
 class ContactUpdate(BaseModel):
     company_id: str | None = None
+    company_name: str | None = None
     first_name: str | None = None
     last_name: str | None = None
     email: str | None = None

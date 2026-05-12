@@ -8,6 +8,7 @@ from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandl
 
 from app.config import settings
 from app.helpers import contact_display_name, group_follow_ups, parse_platform_handles, today_str
+from app.services.search_service import unified_search
 from app.services.sheet_service import (
     companies_sheet,
     contacts_sheet,
@@ -607,26 +608,47 @@ async def cmd_find(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Usage: /find Acme")
         return
 
-    contacts = contacts_sheet.search(query, ["first_name", "last_name", "email", "tags"])
-    companies = companies_sheet.search(query, ["name", "industry"])
+    result = unified_search(query)
 
-    lines = [f"*Search: {query}*\n"]
+    if result["total"] == 0:
+        await update.message.reply_text(f"No VOSS records reference '{query}'.")
+        return
 
-    if contacts:
-        lines.append(f"*Contacts ({len(contacts)}):*")
-        for c in contacts[:5]:
-            name = contact_display_name(c)
-            meta = " · ".join(filter(None, [c.get("segment"), c.get("engagement_stage")]))
-            meta_str = f" [{meta}]" if meta else ""
-            lines.append(f"  • {name} — {c.get('role', '')} | {c.get('email', '')}{meta_str}")
+    lines = [f"*Search: {query}* ({result['total']} record{'s' if result['total'] != 1 else ''})\n"]
 
-    if companies:
-        lines.append(f"\n*Companies ({len(companies)}):*")
-        for co in companies[:5]:
-            lines.append(f"  • {co.get('name', '')} — {co.get('industry', '')}")
+    if result["companies"]:
+        lines.append(f"*Companies ({len(result['companies'])}):*")
+        for co in result["companies"][:5]:
+            industry = f" — {co['industry']}" if co.get("industry") else ""
+            lines.append(f"  • {co.get('name', '')}{industry}")
 
-    if not contacts and not companies:
-        lines.append("No results found.")
+    if result["contacts"]:
+        lines.append(f"\n*Contacts ({len(result['contacts'])}):*")
+        for c in result["contacts"][:5]:
+            company = f" at {c['company_name']}" if c.get("company_name") else ""
+            role = f" — {c['role']}" if c.get("role") else ""
+            lines.append(f"  • {c.get('name', '')}{role}{company}")
+
+    if result["deals"]:
+        lines.append(f"\n*Deals ({len(result['deals'])}):*")
+        for d in result["deals"][:5]:
+            ctx_parts = [p for p in (d.get("contact_name"), d.get("company_name")) if p]
+            ctx = f" ({' / '.join(ctx_parts)})" if ctx_parts else ""
+            stage = f"[{d['stage']}] " if d.get("stage") else ""
+            lines.append(f"  • {stage}{d.get('title', 'Untitled')}{ctx}")
+
+    if result["interactions"]:
+        lines.append(f"\n*Interactions ({len(result['interactions'])}):*")
+        for i in result["interactions"][:5]:
+            date = (i.get("occurred_at") or i.get("created_at") or "")[:10]
+            ctx = f" — {i['contact_name']}" if i.get("contact_name") else ""
+            lines.append(f"  • {date} {i.get('type', '')}: {i.get('subject', '')}{ctx}")
+
+    if result["follow_ups"]:
+        lines.append(f"\n*Follow-ups ({len(result['follow_ups'])}):*")
+        for f in result["follow_ups"][:5]:
+            ctx = f" — {f['contact_name']}" if f.get("contact_name") else ""
+            lines.append(f"  • {f.get('title', '')} (due {f.get('due_date', '?')}){ctx}")
 
     await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
 

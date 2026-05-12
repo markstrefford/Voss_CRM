@@ -2,31 +2,49 @@
 
 import json
 
-from mcp_server.api_client import api_get, api_post
+from mcp_server.api_client import api_get, api_post, api_put
 from mcp_server.helpers import contact_name, format_currency
 
 
-def search_contacts(query: str) -> str:
-    results = api_get("/api/contacts", {"q": query})
-    if not results:
-        return f"No contacts found for '{query}'."
+_UPDATE_FIELDS = (
+    "first_name", "last_name", "email", "phone", "role",
+    "linkedin_url", "platform_handles", "urls",
+    "company_name", "company_id",
+    "tags", "notes", "segment", "engagement_stage",
+    "inbound_channel", "do_not_contact",
+)
 
-    lines = [f"Found {len(results)} contact(s) for '{query}':\n"]
-    for c in results:
-        name = contact_name(c)
-        parts = [f"- **{name}** (ID: {c['id']})"]
-        if c.get("role"):
-            parts.append(f"  Role: {c['role']}")
-        if c.get("company_name"):
-            parts.append(f"  Company: {c['company_name']}")
-        if c.get("email"):
-            parts.append(f"  Email: {c['email']}")
-        if c.get("phone"):
-            parts.append(f"  Phone: {c['phone']}")
-        if c.get("tags"):
-            parts.append(f"  Tags: {c['tags']}")
-        lines.append("\n".join(parts))
-    return "\n".join(lines)
+
+def update_contact(
+    contact_id: str,
+    first_name: str = "",
+    last_name: str = "",
+    email: str = "",
+    phone: str = "",
+    role: str = "",
+    linkedin_url: str = "",
+    platform_handles: str = "",
+    urls: str = "",
+    company_name: str = "",
+    company_id: str = "",
+    tags: str = "",
+    notes: str = "",
+    segment: str = "",
+    engagement_stage: str = "",
+    inbound_channel: str = "",
+    do_not_contact: str = "",
+) -> str:
+    """Update any structured field on an existing contact. company_name is
+    resolved server-side and the company is created if it doesn't exist."""
+    payload = {
+        k: v for k, v in locals().items()
+        if k in _UPDATE_FIELDS and v
+    }
+    if not payload:
+        return "No fields to update."
+    record = api_put(f"/api/contacts/{contact_id}", payload)
+    name = contact_name(record)
+    return f"Updated contact **{name}** (ID: {contact_id})."
 
 
 def get_contact_details(contact_id: str) -> str:

@@ -12,6 +12,7 @@ export function LoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [inviteCode, setInviteCode] = useState('');
+  const [rememberMe, setRememberMe] = useState(() => localStorage.getItem('rememberMe') === 'true');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { login: authLogin } = useAuth();
@@ -25,7 +26,7 @@ export function LoginPage() {
       const res = isRegister
         ? await register(username, password, inviteCode)
         : await login(username, password);
-      authLogin(res.data.access_token);
+      authLogin(res.data.access_token, rememberMe);
       navigate('/');
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Login failed';
@@ -55,6 +56,18 @@ export function LoginPage() {
               <div className="space-y-2">
                 <Label htmlFor="invite">Invite Code</Label>
                 <Input id="invite" value={inviteCode} onChange={e => setInviteCode(e.target.value)} required />
+              </div>
+            )}
+            {!isRegister && (
+              <div className="flex items-center gap-2">
+                <input
+                  id="remember"
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={e => setRememberMe(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300"
+                />
+                <Label htmlFor="remember" className="text-sm font-normal cursor-pointer">Remember me</Label>
               </div>
             )}
             {error && <p className="text-sm text-destructive">{error}</p>}

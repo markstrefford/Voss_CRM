@@ -4,27 +4,71 @@ import asyncio
 
 from mcp.server.fastmcp import FastMCP
 
-from mcp_server.tools.contacts import search_contacts, get_contact_details, create_contact
-from mcp_server.tools.interactions import log_interaction, get_interaction_history
+from mcp_server.tools.companies import update_company
+from mcp_server.tools.contacts import get_contact_details, create_contact, update_contact
+from mcp_server.tools.interactions import log_interaction, get_interaction_history, update_interaction
 from mcp_server.tools.deals import get_pipeline, get_deal, update_deal_stage, create_deal, update_deal, promote_contact_to_deal
-from mcp_server.tools.follow_ups import get_follow_ups, create_follow_up, complete_follow_up
+from mcp_server.tools.follow_ups import (
+    get_follow_ups, create_follow_up, complete_follow_up,
+    update_follow_up, snooze_follow_up,
+)
 from mcp_server.tools.dashboard import get_dashboard_summary
+from mcp_server.tools.search import search as search_voss
 
 mcp = FastMCP("voss-crm")
+
+
+# --- Search ---
+
+@mcp.tool()
+async def tool_search(query: str) :
+    """Unified VOSS search across companies, contacts, deals, interactions, and follow-ups.
+    Resolves foreign keys, so a query for a company name surfaces contacts, deals, interactions, and
+    follow-ups that reference it — not just rows whose own fields contain the literal token.
+    Use this whenever you need to know what VOSS knows about a person, company, or topic."""
+    return await asyncio.to_thread(search_voss, query)
 
 
 # --- Contacts ---
 
 @mcp.tool()
-async def tool_search_contacts(query: str) :
-    """Search contacts by name, email, company, role, or tags."""
-    return await asyncio.to_thread(search_contacts, query)
-
-
-@mcp.tool()
 async def tool_get_contact_details(contact_id: str) :
     """Get full profile for a contact including interactions, deals, and follow-ups."""
     return await asyncio.to_thread(get_contact_details, contact_id)
+
+
+@mcp.tool()
+async def tool_update_contact(
+    contact_id: str,
+    first_name: str = "",
+    last_name: str = "",
+    email: str = "",
+    phone: str = "",
+    role: str = "",
+    linkedin_url: str = "",
+    platform_handles: str = "",
+    urls: str = "",
+    company_name: str = "",
+    company_id: str = "",
+    tags: str = "",
+    notes: str = "",
+    segment: str = "",
+    engagement_stage: str = "",
+    inbound_channel: str = "",
+    do_not_contact: str = "",
+) :
+    """Update any structured field on an existing contact (email, phone, role,
+    company, segment, engagement stage, linkedin, do_not_contact, etc.). Use
+    this — not log_interaction — when capturing a structured fact about a
+    contact. company_name is resolved server-side and the company is created
+    automatically if it doesn't exist."""
+    return await asyncio.to_thread(
+        update_contact, contact_id, first_name, last_name, email, phone,
+        role, linkedin_url, platform_handles, urls,
+        company_name, company_id,
+        tags, notes, segment, engagement_stage,
+        inbound_channel, do_not_contact,
+    )
 
 
 @mcp.tool()
@@ -47,6 +91,26 @@ async def tool_create_contact(
         create_contact, first_name, last_name, email, phone,
         role, company_name, source, tags, notes,
         segment, engagement_stage, inbound_channel,
+    )
+
+
+# --- Companies ---
+
+@mcp.tool()
+async def tool_update_company(
+    company_id: str,
+    name: str = "",
+    industry: str = "",
+    website: str = "",
+    size: str = "",
+    notes: str = "",
+) :
+    """Update a company record's structured fields (industry, website, size,
+    notes, or rename). Use this when you've learned something about a
+    company so the fact lands on the company entity, not buried in an
+    interaction note."""
+    return await asyncio.to_thread(
+        update_company, company_id, name, industry, website, size, notes,
     )
 
 
@@ -76,6 +140,25 @@ async def tool_get_interaction_history(
     """Get recent interaction history, optionally filtered by contact or deal."""
     return await asyncio.to_thread(
         get_interaction_history, contact_id, deal_id, limit,
+    )
+
+
+@mcp.tool()
+async def tool_update_interaction(
+    interaction_id: str,
+    type: str = "",
+    subject: str = "",
+    body: str = "",
+    direction: str = "",
+    url: str = "",
+    occurred_at: str = "",
+) :
+    """Amend a previously-logged interaction — typo fixes, body additions,
+    direction correction. Prefer this over logging a duplicate interaction
+    when the right thing is to update an existing record."""
+    return await asyncio.to_thread(
+        update_interaction, interaction_id, type, subject, body,
+        direction, url, occurred_at,
     )
 
 
@@ -188,6 +271,39 @@ async def tool_create_follow_up(
 async def tool_complete_follow_up(follow_up_id: str) :
     """Mark a follow-up as completed."""
     return await asyncio.to_thread(complete_follow_up, follow_up_id)
+
+
+@mcp.tool()
+async def tool_update_follow_up(
+    follow_up_id: str,
+    title: str = "",
+    due_date: str = "",
+    due_time: str = "",
+    notes: str = "",
+    status: str = "",
+) :
+    """Update an existing follow-up's title, due date/time, notes, or status.
+    For rescheduling specifically (which sets status to 'snoozed' and clears
+    reminder_sent so the new date triggers a fresh notification), use
+    tool_snooze_follow_up — its side-effects matter for downstream alerting."""
+    return await asyncio.to_thread(
+        update_follow_up, follow_up_id, title, due_date, due_time, notes, status,
+    )
+
+
+@mcp.tool()
+async def tool_snooze_follow_up(
+    follow_up_id: str,
+    due_date: str,
+    due_time: str = "",
+) :
+    """Reschedule a follow-up to a new date (YYYY-MM-DD) and optional time.
+    Sets status='snoozed' and clears reminder_sent so the new due date
+    triggers a fresh notification. Use this rather than tool_update_follow_up
+    for reschedule operations."""
+    return await asyncio.to_thread(
+        snooze_follow_up, follow_up_id, due_date, due_time,
+    )
 
 
 # --- Dashboard ---

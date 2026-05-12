@@ -11,7 +11,7 @@ from slowapi.errors import RateLimitExceeded
 
 from app.config import settings
 from app.limiter import limiter
-from app.routers import auth, companies, contacts, deals, email_draft, follow_ups, interactions, notifications, social
+from app.routers import auth, companies, contacts, deals, email_draft, follow_ups, interactions, notifications, search, social
 from app.routers import dashboard
 
 # Structured JSON logging in production, standard logging in development
@@ -136,6 +136,7 @@ app.include_router(dashboard.router)
 app.include_router(notifications.router)
 app.include_router(email_draft.router)
 app.include_router(social.router)
+app.include_router(search.router)
 
 
 @app.get("/api/health")

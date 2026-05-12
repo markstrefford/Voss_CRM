@@ -66,12 +66,18 @@ class SheetService:
         return records
 
     def search(self, query: str, search_fields: list[str]) -> list[dict]:
+        """Token-AND substring match across the named fields. Single-table primitive
+        used for entity resolution (e.g. resolving a name to a contact). User-facing
+        search must use app.services.search_service.unified_search instead — that one
+        resolves foreign keys so a query for a company surfaces contacts at it."""
         records = self._get_all_records()
-        query_lower = query.lower()
-        return [
-            r for r in records
-            if any(query_lower in str(r.get(f, "")).lower() for f in search_fields)
-        ]
+        words = query.lower().split()
+        results = []
+        for r in records:
+            field_values = " ".join(str(r.get(f, "")).lower() for f in search_fields)
+            if all(w in field_values for w in words):
+                results.append(r)
+        return results
 
     def get_by_id(self, record_id: str) -> dict | None:
         records = self._get_all_records()

@@ -103,6 +103,38 @@ export interface EmailDraft {
   body: string;
 }
 
+export interface SearchContactHit extends Contact {
+  name: string;
+  company_name: string;
+}
+
+export interface SearchDealHit extends Deal {
+  contact_name: string;
+  company_name: string;
+}
+
+export interface SearchInteractionHit extends Interaction {
+  contact_name: string;
+  company_name: string;
+  deal_title: string;
+}
+
+export interface SearchFollowUpHit extends FollowUp {
+  contact_name: string;
+  company_name: string;
+  deal_title: string;
+}
+
+export interface SearchResult {
+  query: string;
+  total: number;
+  companies: Company[];
+  contacts: SearchContactHit[];
+  deals: SearchDealHit[];
+  interactions: SearchInteractionHit[];
+  follow_ups: SearchFollowUpHit[];
+}
+
 export interface NotificationItem {
   id: string;
   type: string;
