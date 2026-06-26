@@ -1,8 +1,8 @@
 # State — last updated 2026-06-23
 
-**Active focus:** Story `e02-s02-search-ranking` planned and senior-staff reviewed — single task `t01` (relevance scoring + best-first ordering in the shared engine; FK-resolved names rank lowest; result shape unchanged). Ready to execute. This is the last story under epic `e02-search-enrichment`. `e02-s01` (search filters) already shipped, merged, and deployed.
-**Last completed:** `e02-s01` filters merged to `main` and deployed to Modal. Earlier this session: sheet-ID read fix + create-contact dedup guard (shipped, deployed); contact book deduped 392 → 357.
-**Next:** Execute `e02-s02-t01`; on completion epic `e02-search-enrichment` is done.
+**Active focus:** None — `active/` is empty. Epic `e02-search-enrichment` is **complete**: s01 (multi-value filters) and s02 (relevance ranking) both shipped, verifier-passed, and merged. 150 tests green.
+**Last completed:** `e02-s02` relevance ranking — results now best-first (own fields beat FK-resolved names); surfaces on the agent's search and Telegram. Whole epic done. Earlier this session: search filters (s01), sheet-ID read fix, create-contact dedup guard; contact book deduped 392 → 357.
+**Next:** No active work. Open candidates: a "Best match" web sort (OPEN), the segment-vocabulary cleanup (OPEN), or a new line of work.
 
 ## Open questions
 
