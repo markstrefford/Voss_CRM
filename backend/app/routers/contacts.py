@@ -1,9 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 
 import json
 
 from app.dependencies import get_current_user
-from app.helpers import parse_platform_handles, resolve_or_create_company
+from app.helpers import (
+    build_contact_enrichment,
+    find_duplicate_contact,
+    parse_platform_handles,
+    resolve_or_create_company,
+)
 from app.models import Contact, ContactCreate, ContactFromLinkedIn, ContactUpdate
 from app.services.sheet_service import companies_sheet, contacts_sheet
 
@@ -41,9 +46,10 @@ async def list_contacts(
     return records
 
 
-@router.post("", response_model=Contact, status_code=status.HTTP_201_CREATED)
+@router.post("", status_code=status.HTTP_201_CREATED)
 async def create_contact(
     body: ContactCreate,
+    response: Response,
     _user: dict = Depends(get_current_user),
 ):
     data = body.model_dump()
@@ -53,8 +59,25 @@ async def create_contact(
     name = data.pop("company_name", "")
     if name:
         data["company_id"] = resolve_or_create_company(companies_sheet, name)
+
+    # Dedup guard: a re-add of someone already in the book (common when profiles
+    # are pasted in overlapping batches) enriches the existing contact instead of
+    # creating a duplicate. Match by linkedin_url, then email, then name.
+    existing = find_duplicate_contact(
+        contacts_sheet,
+        linkedin_url=data.get("linkedin_url", ""),
+        email=data.get("email", ""),
+        first_name=data.get("first_name", ""),
+        last_name=data.get("last_name", ""),
+    )
+    if existing:
+        updates = build_contact_enrichment(existing, data)
+        record = contacts_sheet.update(existing["id"], updates) if updates else existing
+        response.status_code = status.HTTP_200_OK
+        return {**record, "deduped": True}
+
     record = contacts_sheet.create(data)
-    return record
+    return {**record, "deduped": False}
 
 
 @router.get("/{contact_id}", response_model=Contact)

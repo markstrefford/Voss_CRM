@@ -144,8 +144,12 @@ def create_contact(
 
     record = api_post("/api/contacts", data)
     name = f"{first_name} {last_name}".strip()
+    # The API dedups: a re-add of an existing person enriches that contact rather
+    # than creating a duplicate. Report which happened so the agent doesn't claim
+    # a new contact was created when it wasn't.
+    verb = "Matched existing contact (enriched, not duplicated)" if record.get("deduped") else "Created contact"
     return (
-        f"Created contact **{name}** (ID: {record['id']})"
+        f"{verb} **{name}** (ID: {record['id']})"
         + (f" at {company_name}" if company_name else "")
         + "."
     )

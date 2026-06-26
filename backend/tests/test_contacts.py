@@ -205,3 +205,60 @@ class TestContactCompanyNameResolution:
             assert resp.status_code == 201
             assert resp.json()["company_id"] == real["id"]
             assert resp.json()["company_id"] != "wrong-id"
+
+
+class TestContactCreateDedup:
+    """create_contact must not duplicate someone already in the book — it should
+    match (linkedin_url > email > name) and enrich the existing contact instead.
+    Seeded: c1 = John Smith / john@example.com / linkedin.com/in/jsmith."""
+
+    def _post(self, client, auth_headers, ws, body):
+        _cache.clear()
+        with patch("app.routers.contacts.contacts_sheet._worksheet", return_value=ws):
+            return client.post("/api/contacts", headers=auth_headers, json=body)
+
+    def test_new_contact_is_created(self, client, auth_headers, seeded_contacts_ws):
+        resp = self._post(client, auth_headers, seeded_contacts_ws, {
+            "first_name": "Brand", "last_name": "New",
+        })
+        assert resp.status_code == 201
+        assert resp.json()["deduped"] is False
+
+    def test_match_by_name(self, client, auth_headers, seeded_contacts_ws):
+        resp = self._post(client, auth_headers, seeded_contacts_ws, {
+            "first_name": "John", "last_name": "Smith",
+        })
+        assert resp.status_code == 200
+        assert resp.json()["deduped"] is True
+        assert resp.json()["id"] == "c1"
+
+    def test_match_by_email_ignores_different_name(self, client, auth_headers, seeded_contacts_ws):
+        resp = self._post(client, auth_headers, seeded_contacts_ws, {
+            "first_name": "Johnny", "last_name": "Smyth", "email": "john@example.com",
+        })
+        assert resp.status_code == 200
+        assert resp.json()["id"] == "c1"
+
+    def test_match_by_linkedin_url(self, client, auth_headers, seeded_contacts_ws):
+        resp = self._post(client, auth_headers, seeded_contacts_ws, {
+            "first_name": "Anyone", "last_name": "Else",
+            "linkedin_url": "https://linkedin.com/in/jsmith",
+        })
+        assert resp.status_code == 200
+        assert resp.json()["id"] == "c1"
+
+    def test_enrich_backfills_blanks_and_advances_stage_without_clobbering(
+        self, client, auth_headers, seeded_contacts_ws
+    ):
+        # c1 has role "CTO" (set), segment "" (blank), engagement_stage "" (blank).
+        resp = self._post(client, auth_headers, seeded_contacts_ws, {
+            "first_name": "John", "last_name": "Smith",
+            "role": "Should Not Overwrite",
+            "segment": "Quant",
+            "engagement_stage": "accepted",
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["segment"] == "Quant"               # blank field backfilled
+        assert data["engagement_stage"] == "accepted"   # stage advanced
+        assert data["role"] == "CTO"                     # set field not clobbered
