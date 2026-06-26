@@ -32,7 +32,12 @@ class SheetService:
         if not force_refresh and cache_key in _cache:
             return _cache[cache_key]
         ws = self._worksheet()
-        records = ws.get_all_records()
+        # numericise_ignore=['all'] keeps every cell as a raw string. Without it, gspread
+        # parses anything that looks numeric — so IDs like "8e648814" become inf, "536e12"
+        # become scientific floats, and "05322845" lose their leading zero, leaving those
+        # rows unaddressable by id. We str()-cast everything next anyway, so this is a no-op
+        # for normal columns and a correctness fix for ids.
+        records = ws.get_all_records(numericise_ignore=["all"])
         # Convert all values to strings for consistency
         records = [{k: str(v) for k, v in r.items()} for r in records]
         _cache[cache_key] = records

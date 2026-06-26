@@ -33,6 +33,17 @@ class TestSheetService:
         results = service.get_all()
         assert len(results) == 2
 
+    def test_reads_ids_without_numericising(self, service, mock_worksheet):
+        # Regression: ids like "8e648814" must not be numericised into inf/scientific
+        # floats on read. We read with numericise_ignore=['all']; assert that contract so
+        # the gspread default (which corrupts such ids) can't creep back in.
+        from unittest.mock import MagicMock
+
+        spy = MagicMock(return_value=[])
+        mock_worksheet.get_all_records = spy
+        service._get_all_records(force_refresh=True)
+        spy.assert_called_once_with(numericise_ignore=["all"])
+
     def test_get_all_with_filter(self, service):
         service.create({"name": "Alice", "email": "alice@test.com", "status": "active"})
         service.create({"name": "Bob", "email": "bob@test.com", "status": "inactive"})

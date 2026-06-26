@@ -17,7 +17,7 @@ def _make_mock_worksheet():
             return ws._headers
         return []
 
-    def get_all_records():
+    def get_all_records(**kwargs):
         if not ws._data:
             return []
         n = len(ws._headers)
