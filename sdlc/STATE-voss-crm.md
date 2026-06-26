@@ -1,9 +1,9 @@
-# State — last updated 2026-05-12
+# State — last updated 2026-06-23
 
-**Active focus:** Epic `e01-agent-surface-parity` closed. Both stories done (`e01-s01-mcp-write-surface` write side, `e01-s02-unified-search` read side, retroactive compile). Modal redeploy + MCP restart confirmed live; `tool_search` and the five new `tool_update_*`/`tool_snooze_*` tools registered.
-**Last completed:** `e01-agent-surface-parity` — moved to `/work/done/`. SDLC tidied (project enum dropped to `<repo-slug>`). `tool_create_contact` docstring now mentions `company_name` resolution.
-**Next:** No active work item. Capture pass when material arrives, or operator picks the next epic.
+**Active focus:** Epic `e02-search-enrichment` compiled. Story `e02-s01-search-filters` planned and reviewed (senior-staff) — two tasks: `t01` filters in the search engine + endpoint (multi-value, OR-within / AND-across), `t02` same filters on the agent's search. Ready to execute. `s02` (rank results best-match-first) stays a roadmap line until planned.
+**Last completed:** Data-integrity session — sheet IDs now read as raw strings (no more `inf`/scientific-float corruption), and `create_contact` gained a dedup guard (match-or-enrich instead of duplicating). Both shipped, tested, deployed to Modal, merged and pushed to `main`. Contact book deduped 392 → 357.
+**Next:** `/ri-execute e02-s01-search-filters` (t01 then t02). Then plan `s02` (ranking).
 
 ## Open questions
 
-- (none)
+- 2 open (see `/sdlc/OPEN.md`) — no `.ri/config.md` (tier/project unset); segment vocabulary drift (data vs frontend enum).
