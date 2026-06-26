@@ -21,12 +21,22 @@ mcp = FastMCP("voss-crm")
 # --- Search ---
 
 @mcp.tool()
-async def tool_search(query: str) :
+async def tool_search(query: str = "", role: str = "", segment: str = "",
+                      engagement_stage: str = "", tags: str = "") :
     """Unified VOSS search across companies, contacts, deals, interactions, and follow-ups.
     Resolves foreign keys, so a query for a company name surfaces contacts, deals, interactions, and
     follow-ups that reference it — not just rows whose own fields contain the literal token.
-    Use this whenever you need to know what VOSS knows about a person, company, or topic."""
-    return await asyncio.to_thread(search_voss, query)
+    Use this whenever you need to know what VOSS knows about a person, company, or topic.
+
+    People can be narrowed with optional filters, each a comma-separated list whose values
+    are OR'd; different filters AND together, and combine with the free-text query:
+    - role: substring match on job title (e.g. "quant, portfolio manager, investment manager"
+      returns that whole cohort in one call)
+    - segment / engagement_stage: exact match on those fields
+    - tags: substring match on tags
+    A filters-only call (no query text) returns the whole filtered group."""
+    return await asyncio.to_thread(
+        search_voss, query, role, segment, engagement_stage, tags)
 
 
 # --- Contacts ---
