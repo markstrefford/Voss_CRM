@@ -306,6 +306,102 @@ class TestSearchFilters:
         assert result["total"] == 3
 
 
+@pytest.fixture
+def rank_data(monkeypatch):
+    """Each bucket has a primary-field match and an incidental (notes / FK) match,
+    so ordering can be asserted within each bucket. Token: 'falcon'."""
+    # Buckets are seeded in WORST-first order so a stable sort by sheet order would
+    # fail the asserts — only relevance ranking produces best-first.
+    companies = [
+        {"id": "co_note", "name": "Bridge Co", "industry": "", "website": "", "notes": "ex-falcon team"},
+        {"id": "co_fal", "name": "Falcon Capital", "industry": "", "website": "", "notes": ""},
+    ]
+    contacts = [
+        _contact("c_notes", "Eve", "Long", "Analyst", "", "", ""),             # tertiary: notes (set below)
+        _contact("c_fkco", "Dan", "Poe", "Analyst", "", "", ""),               # tertiary: resolved company
+        _contact("c_role", "Cara", "Vale", "Falcon Strategist", "", "", ""),   # secondary: role
+        _contact("c_name", "Falcon", "Reed", "Engineer", "", "", ""),          # primary: name
+        _contact("c_mt_lo", "Nova", "Quill", "Analyst", "", "", ""),           # multi-token: name + notes
+        _contact("c_mt_hi", "Nova", "Star", "Analyst", "", "", ""),            # multi-token: both primary
+    ]
+    # contacts carry company_id / notes that _contact() doesn't set
+    by_id = {c["id"]: c for c in contacts}
+    by_id["c_notes"]["notes"] = "loves falcon"
+    by_id["c_fkco"]["company_id"] = "co_fal"
+    by_id["c_mt_lo"]["notes"] = "star gazer"
+    deals = [
+        {"id": "d_fk", "contact_id": "c_name", "company_id": "", "title": "Generic deal",
+         "stage": "lead", "value": "", "currency": "GBP", "priority": "", "notes": ""},  # tertiary: FK contact_name = "Falcon Reed"
+        {"id": "d_notes", "contact_id": "", "company_id": "", "title": "Misc deal",
+         "stage": "lead", "value": "", "currency": "GBP", "priority": "", "notes": "about falcon"},  # secondary: notes
+        {"id": "d_title", "contact_id": "", "company_id": "", "title": "Falcon rollout",
+         "stage": "lead", "value": "", "currency": "GBP", "priority": "", "notes": ""},  # primary: title
+    ]
+    interactions = [
+        {"id": "i_body", "contact_id": "", "deal_id": "", "type": "note", "subject": "Sync",
+         "body": "discussed falcon", "url": "", "direction": "", "occurred_at": "", "created_at": ""},
+        {"id": "i_subj", "contact_id": "", "deal_id": "", "type": "note", "subject": "Falcon sync",
+         "body": "", "url": "", "direction": "", "occurred_at": "", "created_at": ""},
+    ]
+    follow_ups = [
+        {"id": "f_notes", "contact_id": "", "deal_id": "", "title": "Chase",
+         "due_date": "", "due_time": "", "status": "pending", "notes": "re falcon"},
+        {"id": "f_title", "contact_id": "", "deal_id": "", "title": "Chase falcon",
+         "due_date": "", "due_time": "", "status": "pending", "notes": ""},
+    ]
+    monkeypatch.setattr(search_service, "companies_sheet", _stub_sheet(companies))
+    monkeypatch.setattr(search_service, "contacts_sheet", _stub_sheet(contacts))
+    monkeypatch.setattr(search_service, "deals_sheet", _stub_sheet(deals))
+    monkeypatch.setattr(search_service, "interactions_sheet", _stub_sheet(interactions))
+    monkeypatch.setattr(search_service, "follow_ups_sheet", _stub_sheet(follow_ups))
+
+
+class TestSearchRanking:
+    def _order(self, hits):
+        return [h["id"] for h in hits]
+
+    def test_contact_name_beats_role_beats_incidental(self, rank_data):
+        order = self._order(search_service.unified_search("falcon")["contacts"])
+        # primary (name) before secondary (role) before tertiary (notes / FK company)
+        assert order.index("c_name") < order.index("c_role")
+        assert order.index("c_role") < order.index("c_notes")
+        assert order.index("c_role") < order.index("c_fkco")  # role beats resolved company name
+
+    def test_multi_token_sums_best_tier(self, rank_data):
+        order = self._order(search_service.unified_search("nova star")["contacts"])
+        assert order.index("c_mt_hi") < order.index("c_mt_lo")
+
+    def test_company_name_beats_notes(self, rank_data):
+        order = self._order(search_service.unified_search("falcon")["companies"])
+        assert order.index("co_fal") < order.index("co_note")
+
+    def test_deal_title_beats_notes_and_fk_name(self, rank_data):
+        order = self._order(search_service.unified_search("falcon")["deals"])
+        assert order.index("d_title") < order.index("d_notes")  # primary > secondary
+        assert order.index("d_title") < order.index("d_fk")     # primary > tertiary (FK)
+
+    def test_interaction_subject_beats_body(self, rank_data):
+        order = self._order(search_service.unified_search("falcon")["interactions"])
+        assert order.index("i_subj") < order.index("i_body")
+
+    def test_follow_up_title_beats_notes(self, rank_data):
+        order = self._order(search_service.unified_search("falcon")["follow_ups"])
+        assert order.index("f_title") < order.index("f_notes")
+
+    def test_score_not_leaked_into_output(self, rank_data):
+        result = search_service.unified_search("falcon")
+        assert "score" not in result["contacts"][0]
+
+    def test_membership_unchanged(self, voss_data):
+        """Ranking must not drop or add anyone vs the pre-ranking behaviour."""
+        result = search_service.unified_search("Endava")
+        assert {c["id"] for c in result["contacts"]} == {"c_andrew", "c_tom"}
+
+    def test_filters_only_stable_and_safe(self, cohort_data):
+        result = search_service.unified_search("", segments=["quant"])
+        assert {c["id"] for c in result["contacts"]} == {"q1", "q2", "q3"}
+
+
 class TestSearchEndpoint:
     def test_endpoint_requires_auth(self, client):
         resp = client.get("/api/search?q=Endava")

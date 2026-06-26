@@ -60,6 +60,28 @@ def _passes_contact_filters(contact, roles, segments, stages, tag_filters) -> bo
     return True
 
 
+def _score(tiers: list[str], tokens: list[str]) -> int:
+    """Relevance score: for each token, add the weight of the highest tier whose text
+    contains it (primary tier weighs most). Tiers are ordered strongest-first; text is
+    lowercased here. No tokens (filters-only) → 0, leaving order stable."""
+    n = len(tiers)
+    lowered = [t.lower() for t in tiers]
+    total = 0
+    for tok in tokens:
+        tok = tok.lower()
+        for i, text in enumerate(lowered):
+            if tok in text:
+                total += n - i
+                break
+    return total
+
+
+def _ranked(scored: list) -> list:
+    """Stable-sort scored (score, hit) pairs best-first and return the hits."""
+    scored.sort(key=lambda pair: -pair[0])
+    return [hit for _, hit in scored]
+
+
 def _empty_result(query: str) -> dict:
     return {
         "query": query,
@@ -108,7 +130,7 @@ def unified_search(
     def deal_title(did: str) -> str:
         return deal_by_id.get(did, {}).get("title", "")
 
-    contact_hits = []
+    contact_scored = []
     for c in contacts:
         if c.get("status") == "archived":
             continue
@@ -128,11 +150,22 @@ def unified_search(
             continue
         if not _passes_contact_filters(c, roles, segments, engagement_stages, tag_filters):
             continue
-        contact_hits.append({
+        # Relevance tiers, strongest first. Resolved company fields are the weakest
+        # signal (a contact reached via its company is "related to", not "is").
+        tiers = [
+            f"{c.get('first_name', '')} {c.get('last_name', '')}",
+            " ".join([c.get("role", ""), c.get("email", ""), c.get("tags", ""),
+                      c.get("segment", ""), c.get("engagement_stage", ""),
+                      c.get("platform_handles", ""), c.get("urls", "")]),
+            " ".join([c.get("notes", ""), c.get("source", ""), c.get("phone", ""),
+                      cname, company.get("industry", ""), company.get("website", "")]),
+        ]
+        contact_scored.append((_score(tiers, tokens), {
             **c,
             "name": contact_display_name(c),
             "company_name": cname,
-        })
+        }))
+    contact_hits = _ranked(contact_scored)
 
     # The remaining buckets are text-only: structured filters describe people, not
     # companies/deals/interactions/follow-ups. With no text query they stay empty.
@@ -142,17 +175,23 @@ def unified_search(
     follow_up_hits = []
 
     if tokens:
+        company_scored = []
         for c in companies:
             haystack = " ".join([
                 c.get("name", ""), c.get("industry", ""),
                 c.get("website", ""), c.get("notes", ""),
             ]).lower()
             if _matches(haystack, tokens):
-                company_hits.append({
+                tiers = [c.get("name", ""),
+                         " ".join([c.get("industry", ""), c.get("website", "")]),
+                         c.get("notes", "")]
+                company_scored.append((_score(tiers, tokens), {
                     **c,
                     "name": c.get("name", ""),
-                })
+                }))
+        company_hits = _ranked(company_scored)
 
+        deal_scored = []
         for d in deals:
             contact = contact_by_id.get(d.get("contact_id", ""), {})
             contname = contact_display_name(contact) if contact else ""
@@ -163,12 +202,17 @@ def unified_search(
                 cname, contname,
             ]).lower()
             if _matches(haystack, tokens):
-                deal_hits.append({
+                tiers = [d.get("title", ""),
+                         " ".join([d.get("stage", ""), d.get("priority", ""), d.get("notes", "")]),
+                         " ".join([contname, cname])]
+                deal_scored.append((_score(tiers, tokens), {
                     **d,
                     "contact_name": contname,
                     "company_name": cname,
-                })
+                }))
+        deal_hits = _ranked(deal_scored)
 
+        interaction_scored = []
         for i in interactions:
             contact = contact_by_id.get(i.get("contact_id", ""), {})
             contname = contact_display_name(contact) if contact else ""
@@ -183,13 +227,19 @@ def unified_search(
                 contname, cname, dtitle,
             ]).lower()
             if _matches(haystack, tokens):
-                interaction_hits.append({
+                tiers = [i.get("subject", ""),
+                         " ".join([i.get("body", ""), i.get("type", ""),
+                                   i.get("direction", ""), i.get("url", "")]),
+                         " ".join([contname, cname, dtitle])]
+                interaction_scored.append((_score(tiers, tokens), {
                     **i,
                     "contact_name": contname,
                     "company_name": cname,
                     "deal_title": dtitle,
-                })
+                }))
+        interaction_hits = _ranked(interaction_scored)
 
+        follow_up_scored = []
         for f in follow_ups:
             contact = contact_by_id.get(f.get("contact_id", ""), {})
             contname = contact_display_name(contact) if contact else ""
@@ -203,12 +253,16 @@ def unified_search(
                 contname, cname, dtitle,
             ]).lower()
             if _matches(haystack, tokens):
-                follow_up_hits.append({
+                tiers = [f.get("title", ""),
+                         " ".join([f.get("notes", ""), f.get("status", "")]),
+                         " ".join([contname, cname, dtitle])]
+                follow_up_scored.append((_score(tiers, tokens), {
                     **f,
                     "contact_name": contname,
                     "company_name": cname,
                     "deal_title": dtitle,
-                })
+                }))
+        follow_up_hits = _ranked(follow_up_scored)
 
     total = (len(company_hits) + len(contact_hits) + len(deal_hits)
              + len(interaction_hits) + len(follow_up_hits))
