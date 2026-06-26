@@ -209,10 +209,114 @@ def test_total_aggregates_across_categories(voss_data):
     )
 
 
+def _contact(cid, first, last, role, segment, stage, tags, status="active"):
+    return {
+        "id": cid, "company_id": "", "first_name": first, "last_name": last,
+        "email": "", "phone": "", "role": role, "linkedin_url": "",
+        "platform_handles": "", "urls": "", "source": "", "referral_contact_id": "",
+        "tags": tags, "notes": "", "status": status,
+        "segment": segment, "engagement_stage": stage,
+        "inbound_channel": "", "do_not_contact": "", "campaign_id": "",
+    }
+
+
+@pytest.fixture
+def cohort_data(monkeypatch):
+    """A quant cohort plus a non-quant and an archived row, for filter tests."""
+    contacts = [
+        _contact("q1", "Cara", "Quantly", "Quant Researcher", "Quant", "accepted", "Quant, signal-strata"),
+        _contact("q2", "Polly", "Folio", "Portfolio Manager", "Quant", "new", "Quant, direct"),
+        _contact("q3", "Ivan", "Vester", "Investment Analyst", "Quant", "accepted", "Quant"),
+        _contact("o1", "Otto", "Other", "Software Engineer", "consulting", "new", "eng"),
+        _contact("a1", "Arch", "Ived", "Quant Researcher", "Quant", "accepted", "Quant", status="archived"),
+    ]
+    # A company that itself contains "quant" — proves filters-only never leaks it
+    # into the company bucket (filters describe people, not companies).
+    companies = [{"id": "co1", "name": "Quant Hedge Fund", "industry": "",
+                  "website": "", "notes": ""}]
+    monkeypatch.setattr(search_service, "companies_sheet", _stub_sheet(companies))
+    monkeypatch.setattr(search_service, "contacts_sheet", _stub_sheet(contacts))
+    monkeypatch.setattr(search_service, "deals_sheet", _stub_sheet([]))
+    monkeypatch.setattr(search_service, "interactions_sheet", _stub_sheet([]))
+    monkeypatch.setattr(search_service, "follow_ups_sheet", _stub_sheet([]))
+
+
+class TestSearchFilters:
+    def test_multi_value_role_is_or(self, cohort_data):
+        """The motivating query: three roles in one call returns the union."""
+        result = search_service.unified_search(
+            "", roles=["quant", "portfolio manager", "investment"])
+        assert {c["id"] for c in result["contacts"]} == {"q1", "q2", "q3"}
+
+    def test_single_role_substring(self, cohort_data):
+        result = search_service.unified_search("", roles=["portfolio"])
+        assert {c["id"] for c in result["contacts"]} == {"q2"}
+
+    def test_role_accepts_bare_string(self, cohort_data):
+        result = search_service.unified_search("", roles="investment")
+        assert {c["id"] for c in result["contacts"]} == {"q3"}
+
+    def test_segment_exact_match(self, cohort_data):
+        result = search_service.unified_search("", segments=["quant"])
+        assert {c["id"] for c in result["contacts"]} == {"q1", "q2", "q3"}
+
+    def test_engagement_stage_filter(self, cohort_data):
+        result = search_service.unified_search("", engagement_stages=["accepted"])
+        assert {c["id"] for c in result["contacts"]} == {"q1", "q3"}
+
+    def test_tags_substring(self, cohort_data):
+        result = search_service.unified_search("", tags=["direct"])
+        assert {c["id"] for c in result["contacts"]} == {"q2"}
+
+    def test_filters_and_across_kinds(self, cohort_data):
+        result = search_service.unified_search(
+            "", roles=["quant", "portfolio manager", "investment"],
+            engagement_stages=["accepted"])
+        assert {c["id"] for c in result["contacts"]} == {"q1", "q3"}
+
+    def test_text_and_filter_combine(self, cohort_data):
+        result = search_service.unified_search("researcher", segments=["quant"])
+        assert {c["id"] for c in result["contacts"]} == {"q1"}
+
+    def test_filters_only_no_text(self, cohort_data):
+        result = search_service.unified_search("", segments=["quant"])
+        assert result["total"] == 3
+
+    def test_no_text_no_filters_returns_empty(self, cohort_data):
+        result = search_service.unified_search("")
+        assert result["total"] == 0
+        assert result["contacts"] == []
+
+    def test_archived_excluded_under_filter(self, cohort_data):
+        result = search_service.unified_search("", segments=["quant"])
+        assert "a1" not in {c["id"] for c in result["contacts"]}
+
+    def test_multi_value_segment(self, cohort_data):
+        result = search_service.unified_search("", segments=["quant", "consulting"])
+        assert {c["id"] for c in result["contacts"]} == {"q1", "q2", "q3", "o1"}
+
+    def test_filters_only_leaves_non_contact_buckets_empty(self, cohort_data):
+        """Even with a 'Quant'-named company present, a filters-only query returns
+        only people — the other buckets stay text-driven."""
+        result = search_service.unified_search("", segments=["quant"])
+        assert result["companies"] == []
+        assert result["deals"] == []
+        assert result["interactions"] == []
+        assert result["follow_ups"] == []
+        assert result["total"] == 3
+
+
 class TestSearchEndpoint:
     def test_endpoint_requires_auth(self, client):
         resp = client.get("/api/search?q=Endava")
         assert resp.status_code == 401
+
+    def test_endpoint_passes_filters(self, client, auth_headers, cohort_data):
+        resp = client.get(
+            "/api/search?role=quant,portfolio manager,investment", headers=auth_headers)
+        assert resp.status_code == 200
+        ids = {c["id"] for c in resp.json()["contacts"]}
+        assert ids == {"q1", "q2", "q3"}
 
     def test_endpoint_returns_grouped_payload(self, client, auth_headers, voss_data):
         resp = client.get("/api/search?q=Endava", headers=auth_headers)
